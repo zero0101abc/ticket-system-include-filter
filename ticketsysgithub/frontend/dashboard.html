@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Ticket Dashboard</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        body { background-color: #f3f4f6; }
+        .card { transition: all 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .loading-spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .table-row { transition: all 0.15s; }
+        .table-row:hover { background-color: #f9fafb; }
+        .table-row.selected { background-color: #eff6ff; border-left: 3px solid #3b82f6; }
+        .table-row.selected:hover { background-color: #dbeafe; }
+        
+        .table-container::-webkit-scrollbar { width: 8px; height: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f5f9; }
+        .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const PROBLEM_OPTIONS = [
+            "Windows OS Time/Bios Time/TV time issue", "wrong order", "network issue",
+            "hardware issue", "software issue", "shop using imean issue",
+            "tv/hdmi issue", "pos sync issue", "menuphoto issue", "power issue"
+        ];
+        const HANDLER_OPTIONS = ["CC", "TW", "TS", "TC", "HA", "GL", "NT", "USE_MISSING"];
+
+        const getTodayDate = () => new Date().toISOString().split('T')[0];
+        const getFirstDayOfMonth = () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
+        const SVGIcons = {
+            search: <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>,
+            x: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>,
+            mail: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>,
+            check: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>,
+            monitor: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>,
+            users: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>,
+            alert: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>,
+            bag: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>,
+            trash: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>,
+            download: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>,
+            checkcircle: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        };
+
+        // Detail Modal Component
+        const DetailModal = ({ ticket, onClose, onUpdate, onAutoSave }) => {
+            const [editedTicket, setEditedTicket] = useState({...ticket});
+            const [isSaving, setIsSaving] = useState(false);
+
+            const handleSave = async () => {
+                setIsSaving(true);
+                try {
+                    await onAutoSave(editedTicket);
+                    onUpdate(editedTicket);
+                    onClose();
+                } catch (error) {
+                    alert('Error saving: ' + error.message);
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+
+            const handleChange = (field, value) => {
+                setEditedTicket(prev => ({ ...prev, [field]: value }));
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+                    <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-gray-900">Ticket Details</h2>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                                {SVGIcons.x}
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Number</label>
+                                    <input type="text" value={editedTicket.ticket_number || ''} disabled className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Shop</label>
+                                    <input type="text" value={editedTicket.shop || ''} disabled className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <textarea value={editedTicket.description || ''} disabled className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 h-20" />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Report Time</label>
+                                <input 
+                                    type="datetime-local" 
+                                    value={editedTicket.date ? editedTicket.date.replace(' ', 'T') : ''} 
+                                    onChange={(e) => handleChange('date', e.target.value.replace('T', ' '))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                />
+                            </div>
+
+                            <div className="border-t pt-4">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-3">Editable Information</h3>
+                                
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                                        <select 
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            value={editedTicket.assigned_to || ''}
+                                            onChange={(e) => {
+                                                handleChange('assigned_to', e.target.value);
+                                                onAutoSave({ ...editedTicket, assigned_to: e.target.value });
+                                            }}
+                                        >
+                                            <option value="">-</option>
+                                            {HANDLER_OPTIONS.filter(opt => opt !== 'USE_MISSING').map(opt => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Problem</label>
+                                        <select 
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            value={editedTicket.problem || ''}
+                                            onChange={(e) => {
+                                                handleChange('problem', e.target.value);
+                                                onAutoSave({ ...editedTicket, problem: e.target.value });
+                                            }}
+                                        >
+                                            <option value="">Select problem type...</option>
+                                            {PROBLEM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            className={`px-4 py-2 rounded-lg font-medium transition ${editedTicket.status === 'in progress' ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                            onClick={() => {
+                                                handleChange('status', 'in progress');
+                                                onAutoSave({ ...editedTicket, status: 'in progress' });
+                                            }}
+                                        >
+                                            In Progress
+                                        </button>
+                                        <button
+                                            className={`px-4 py-2 rounded-lg font-medium transition ${editedTicket.status === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                            onClick={() => {
+                                                handleChange('status', 'completed');
+                                                onAutoSave({ ...editedTicket, status: 'completed' });
+                                            }}
+                                        >
+                                            Completed
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Resolve Time</label>
+                                        <input 
+                                            type="datetime-local" 
+                                            value={editedTicket.resolve_time || ''} 
+                                            onChange={(e) => {
+                                                handleChange('resolve_time', e.target.value);
+                                                onAutoSave({ ...editedTicket, resolve_time: e.target.value });
+                                            }}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">PH/RM/OS</label>
+                                        <input 
+                                            type="text" 
+                                            value={editedTicket.ph_rm_os || ''} 
+                                            onChange={(e) => {
+                                                handleChange('ph_rm_os', e.target.value);
+                                                onAutoSave({ ...editedTicket, ph_rm_os: e.target.value });
+                                            }}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                            placeholder="Enter PH/RM/OS" 
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Solution</label>
+                                    <textarea 
+                                        value={editedTicket.solution || ''} 
+                                        onChange={(e) => {
+                                            handleChange('solution', e.target.value);
+                                            onAutoSave({ ...editedTicket, solution: e.target.value });
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-20" 
+                                        placeholder="Enter solution" 
+                                    />
+                                </div>
+
+                                <div className="mt-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">F/U Action</label>
+                                    <textarea 
+                                        value={editedTicket.fu_action || ''} 
+                                        onChange={(e) => {
+                                            handleChange('fu_action', e.target.value);
+                                            onAutoSave({ ...editedTicket, fu_action: e.target.value });
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-20" 
+                                        placeholder="Enter follow-up action" 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium">
+                                Cancel
+                            </button>
+                            <button onClick={handleSave} disabled={isSaving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-blue-400">
+                                {isSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Add Ticket Modal Component
+        const AddTicketModal = ({ onClose, onAdd }) => {
+            const getLocalDateTime = () => {
+                const now = new Date();
+                const pad = n => n.toString().padStart(2, '0');
+                return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            };
+            const [newTicket, setNewTicket] = useState({
+                ticket_number: '',
+                shop: '',
+                description: '',
+                date: getLocalDateTime(),
+                problem: '',
+                resolve_time: '',
+                ph_rm_os: '',
+                solution: '',
+                fu_action: '',
+                handled_by: '',
+                assigned_to: '',
+                status: 'in progress'
+            });
+            const [isSaving, setIsSaving] = useState(false);
+
+            const handleChange = (field, value) => {
+                setNewTicket(prev => ({ ...prev, [field]: value }));
+            };
+
+            const handleSubmit = async () => {
+                setIsSaving(true);
+                try {
+                    await onAdd(newTicket);
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-gray-900">Add New Ticket</h2>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                                {SVGIcons.x}
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Number</label>
+                                    <input 
+                                        type="text" 
+                                        value={newTicket.ticket_number} 
+                                        onChange={(e) => handleChange('ticket_number', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                        placeholder="Leave empty for auto-generated"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Shop</label>
+                                    <input 
+                                        type="text" 
+                                        value={newTicket.shop} 
+                                        onChange={(e) => handleChange('shop', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                        placeholder="e.g., cdc001"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <textarea 
+                                    value={newTicket.description} 
+                                    onChange={(e) => handleChange('description', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-20" 
+                                    placeholder="Enter ticket description"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Report Time</label>
+                                <input 
+                                    type="datetime-local" 
+                                    value={newTicket.date} 
+                                    onChange={(e) => handleChange('date', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                                    <select 
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        value={newTicket.assigned_to || ''}
+                                        onChange={(e) => handleChange('assigned_to', e.target.value)}
+                                    >
+                                        <option value="">-</option>
+                                        {HANDLER_OPTIONS.filter(opt => opt !== 'USE_MISSING').map(opt => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Problem</label>
+                                    <select 
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        value={newTicket.problem}
+                                        onChange={(e) => handleChange('problem', e.target.value)}
+                                    >
+                                        <option value="">Select problem type...</option>
+                                        {PROBLEM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <div className="flex gap-2">
+                                    <button
+                                        className={`px-4 py-2 rounded-lg font-medium transition ${newTicket.status === 'in progress' ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                        onClick={() => handleChange('status', 'in progress')}
+                                    >
+                                        In Progress
+                                    </button>
+                                    <button
+                                        className={`px-4 py-2 rounded-lg font-medium transition ${newTicket.status === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                        onClick={() => handleChange('status', 'completed')}
+                                    >
+                                        Completed
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Resolve Time</label>
+                                    <input 
+                                        type="datetime-local" 
+                                        value={newTicket.resolve_time} 
+                                        onChange={(e) => handleChange('resolve_time', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">PH/RM/OS</label>
+                                    <input 
+                                        type="text" 
+                                        value={newTicket.ph_rm_os} 
+                                        onChange={(e) => handleChange('ph_rm_os', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                        placeholder="Enter PH/RM/OS"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Solution</label>
+                                <textarea 
+                                    value={newTicket.solution} 
+                                    onChange={(e) => handleChange('solution', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-20" 
+                                    placeholder="Enter solution"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">F/U Action</label>
+                                <textarea 
+                                    value={newTicket.fu_action} 
+                                    onChange={(e) => handleChange('fu_action', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-20" 
+                                    placeholder="Enter follow-up action"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium">
+                                Cancel
+                            </button>
+                            <button onClick={handleSubmit} disabled={isSaving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium disabled:bg-indigo-400">
+                                {isSaving ? 'Adding...' : 'Add Ticket'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const StatCard = ({ title, value, icon, color }) => (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                <div className={`p-3 rounded-full ${color.bg} bg-opacity-10 ${color.text}`}>
+                    {icon}
+                </div>
+                <div>
+                    <p className="text-sm text-gray-500 font-medium">{title}</p>
+                    <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
+                </div>
+            </div>
+        );
+
+        const TableView = ({ tickets, selectedRows, onRowSelect, onRowClick, onUpdateTicket, onAutoSave, sortColumn, sortDirection, onSort }) => {
+            const thClasses = "px-2 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100";
+            
+            const columnWidths = {
+                checkbox: 40,
+                ticket_number: 120,
+                shop: 150,
+                description: 200,
+                date: 140,
+                assigned_to: 80,
+                username: 80,
+                phone: 80,
+                status: 90
+            };
+            
+            return (
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="table-container overflow-x-auto">
+                        <table className="w-full whitespace-nowrap">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th style={{width: columnWidths.checkbox}} className="px-2 py-3">
+                                        <input type="checkbox" className="rounded border-gray-300 text-blue-600" checked={selectedRows.length === tickets.length && tickets.length > 0} onChange={(e) => onRowSelect(e.target.checked ? 'all' : 'none')} />
+                                    </th>
+                                    <th style={{width: columnWidths.ticket_number}} className={thClasses} onClick={() => onSort('ticket_number')}>Ticket #</th>
+                                    <th style={{width: columnWidths.shop}} className={thClasses} onClick={() => onSort('shop')}>Shop</th>
+                                    <th style={{width: columnWidths.description}} className={thClasses} onClick={() => onSort('description')}>Description</th>
+                                    <th style={{width: columnWidths.date}} className={thClasses} onClick={() => onSort('date')}>Report Time</th>
+                                    <th style={{width: columnWidths.assigned_to}} className={thClasses}>Assigned To</th>
+                                    <th style={{width: columnWidths.username}} className={thClasses}>Username</th>
+                                    <th style={{width: columnWidths.phone}} className={thClasses}>Phone</th>
+                                    <th style={{width: columnWidths.status}} className={thClasses} onClick={() => onSort('status')}>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {tickets.map((ticket, index) => (
+                                    <tr key={index} className={`table-row cursor-pointer ${selectedRows.includes(index) ? 'selected' : ''}`} onClick={() => onRowClick(index)}>
+                                        <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600" checked={selectedRows.includes(index)} onChange={(e) => { e.stopPropagation(); onRowSelect(index); }} />
+                                        </td>
+                                        <td className="px-2 py-3 text-sm font-medium text-gray-900">{ticket.ticket_number || '-'}</td>
+                                        <td className="px-2 py-3 text-sm">
+                                                <div className="font-medium text-gray-900">{ticket.shop || '-'}</div>
+                                                {(ticket.ip || ticket.address) && (
+                                                    <div className="mt-1 flex flex-col gap-0.5">
+                                                        {ticket.ip && (
+                                                            <div className="text-xs text-blue-600 flex items-center gap-1">
+                                                                <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                                                <span>{ticket.ip}</span>
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(ticket.ip); }}
+                                                                    className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
+                                                                    title="Copy IP"
+                                                                >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {ticket.address && (
+                                                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                                                                <svg className="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                                                <span className="truncate max-w-[150px]" title={ticket.address}>{ticket.address}</span>
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(ticket.address); }}
+                                                                    className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+                                                                    title="Copy Address"
+                                                                >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        <td className="px-2 py-3 text-sm text-gray-600 max-w-[200px] truncate" title={ticket.description}>{ticket.description}</td>
+                                        <td className="px-2 py-3 text-sm text-gray-600">{ticket.date || ticket.received_time}</td>
+                                        <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                                            <select className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500" value={ticket.assigned_to || ''} onChange={(e) => { const val = e.target.value; onUpdateTicket(index, 'assigned_to', val); onAutoSave({ ...ticket, assigned_to: val }); }}>
+                                                <option value="">-</option>
+                                                {HANDLER_OPTIONS.filter(opt => opt !== 'USE_MISSING').map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                            </select>
+                                        </td>
+                                        <td className="px-2 py-3 text-sm text-gray-700">{ticket.username || '-'}</td>
+                                        <td className="px-2 py-3 text-sm text-gray-700">{ticket.phone || '-'}</td>
+                                        <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                                            <button className={`text-xs px-3 py-1 rounded-full font-medium ${ticket.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`} onClick={(e) => { e.stopPropagation(); const newStatus = ticket.status === 'completed' ? 'in progress' : 'completed'; onUpdateTicket(index, 'status', newStatus); onAutoSave({ ...ticket, status: newStatus }); }}>
+                                                {ticket.status || 'in progress'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [emails, setEmails] = useState([]);
+            const [searchTerm, setSearchTerm] = useState("");
+            const [filterType, setFilterType] = useState("all"); 
+            const [startDate, setStartDate] = useState(getFirstDayOfMonth());
+            const [endDate, setEndDate] = useState(getTodayDate());
+            const [isScanning, setIsScanning] = useState(false);
+            const [stats, setStats] = useState({ total: 0, extracted: 0, mx: 0, cdc: 0, fw: 0 });
+            const [selectedRows, setSelectedRows] = useState([]);
+            const [selectedTicketIndex, setSelectedTicketIndex] = useState(null);
+            const [sortColumn, setSortColumn] = useState('date');
+            const [sortDirection, setSortDirection] = useState('desc');
+            const [userPermissions, setUserPermissions] = useState([]);
+            const [userRole, setUserRole] = useState('staff');
+            const [autoScanEnabled, setAutoScanEnabled] = useState(false);
+            const [autoScanPolling, setAutoScanPolling] = useState(null);
+            const [showAddTicketModal, setShowAddTicketModal] = useState(false);
+
+            const loadTickets = async () => {
+                try {
+                    const res = await fetch('/database/ticket.json', {credentials: 'include'});
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        setEmails(data.map(t => ({
+                            ...t, problem: t.problem || '', resolve_time: t.resolve_time || '', status: t.status || 'in progress'
+                        })));
+                    }
+                } catch (e) { console.error('Error loading tickets:', e); }
+            };
+
+            useEffect(() => { 
+                loadTickets(); 
+                window.onfocus = () => { loadTickets(); }; 
+                return () => { window.onfocus = null; }; 
+            }, []);
+
+            useEffect(() => {
+                const checkPermissions = async () => {
+                    try { 
+                        const res = await fetch('/api/my-permissions', {credentials: 'include'}); 
+                        if (res.ok) { 
+                            const data = await res.json(); 
+                            setUserRole(data.role || 'staff');
+                            setUserPermissions(data.permissions || []); 
+                        } 
+                    } catch (e) {}
+                };
+                checkPermissions();
+
+                const checkAutoScan = async () => {
+                    try {
+                        const res = await fetch('/api/auto-scan-status', {credentials: 'include'});
+                        if (res.ok) {
+                            const data = await res.json();
+                            setAutoScanEnabled(data.enabled);
+                        }
+                    } catch (e) { }
+                };
+                checkAutoScan();
+            }, []);
+
+            // Auto-scan polling
+            useEffect(() => {
+                if (autoScanEnabled) {
+                    const pollOneEmail = async () => {
+                        try {
+                            const res = await fetch('/api/auto-scan/one', { method: 'POST', credentials: 'include' });
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (data.new_email) {
+                                    // Reload all tickets from JSON to ensure list is in sync
+                                    loadTickets();
+                                }
+                            }
+                        } catch (e) { }
+                    };
+                    const interval = setInterval(pollOneEmail, 5000);
+                    setAutoScanPolling(interval);
+                    return () => clearInterval(interval);
+                } else {
+                    if (autoScanPolling) {
+                        clearInterval(autoScanPolling);
+                        setAutoScanPolling(null);
+                    }
+                }
+            }, [autoScanEnabled]);
+
+            const hasPermission = (perm) => userPermissions.includes('*') || userPermissions.includes(perm) || userPermissions.length === 0;
+
+            const filteredEmails = useMemo(() => {
+                let result = emails.filter(email => {
+                    if (!email) return false;
+                    const ticket = email.ticket_number || email.extracted_data?.ticket_number || "";
+                    const shop = email.shop || email.extracted_data?.shop || "";
+                    const desc = email.description || email.extracted_data?.description || "";
+                    
+                    const searchLower = searchTerm.toLowerCase();
+                    const matchesSearch = ticket.toLowerCase().includes(searchLower) || shop.toLowerCase().includes(searchLower) || desc.toLowerCase().includes(searchLower);
+
+                    let matchesType = true;
+                    if (filterType === 'mx') matchesType = ticket.startsWith('BZ');
+                    if (filterType === 'fw') matchesType = shop.toLowerCase().startsWith('fw');
+                    if (filterType === 'cdc') matchesType = ticket.startsWith('HK') || ticket.startsWith('CDC') || shop.toLowerCase().startsWith('cdc');
+
+                    // Date filtering
+                    let matchesDate = true;
+                    const dateStr = email.date || email.received_time;
+                    if (dateStr && (startDate || endDate)) {
+                        const emailDate = new Date(dateStr);
+                        emailDate.setHours(0, 0, 0, 0);
+                        if (startDate) {
+                            const start = new Date(startDate);
+                            start.setHours(0, 0, 0, 0);
+                            if (emailDate < start) matchesDate = false;
+                        }
+                        if (endDate) {
+                            const end = new Date(endDate);
+                            end.setHours(0, 0, 0, 0);
+                            if (emailDate > end) matchesDate = false;
+                        }
+                    }
+
+                    return matchesSearch && matchesType && matchesDate;
+                });
+
+                if (sortColumn) {
+                    result.sort((a, b) => {
+                        let aVal = a[sortColumn] || ''; let bVal = b[sortColumn] || '';
+                        if (sortColumn === 'date') { aVal = new Date(aVal); bVal = new Date(bVal); }
+                        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+                        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+                return result;
+            }, [emails, searchTerm, filterType, startDate, endDate, sortColumn, sortDirection]);
+
+            useEffect(() => {
+                const newStats = filteredEmails.reduce((acc, email) => {
+                    if (!email) return acc;
+                    acc.total++;
+                    const ticket = email.ticket_number || "";
+                    const shop = email.shop || "";
+                    if (ticket) acc.extracted++;
+                    if (ticket.startsWith('BZ')) acc.mx++;
+                    else if (ticket.startsWith('HK') || ticket.startsWith('CDC')) acc.cdc++;
+                    else if (shop.toLowerCase().startsWith('fw')) acc.fw++;
+                    return acc;
+                }, { total: 0, mx: 0, cdc: 0, fw: 0, extracted: 0 });
+                setStats(newStats);
+            }, [emails, searchTerm, filterType, startDate, endDate]);
+
+            const handleScan = async (scanAll = false) => {
+                setIsScanning(true);
+                try {
+                    const endpoint = scanAll ? '/run-scan-all' : '/run-scan';
+                    const response = await fetch(endpoint, {credentials: 'include'});
+                    const result = await response.json();
+                    if (result.status === 'success') { loadTickets(); alert("Scan complete!"); } 
+                    else { alert("Scan failed: " + result.message); }
+                } catch (error) { alert("Cannot connect to server."); } 
+                finally { setIsScanning(false); }
+            };
+
+            const toggleAutoScan = async () => {
+                try {
+                    const newState = !autoScanEnabled;
+                    const res = await fetch('/api/auto-scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: newState }), credentials: 'include' });
+                    if (res.ok) setAutoScanEnabled(newState);
+                } catch (e) { alert('Error toggling auto-scan'); }
+            };
+
+            const handleExportXLSX = (selectedOnly = false) => {
+                const headers = ['ticket_number', 'shop', 'description', 'date', 'problem', 'resolve_time', 'ph_rm_os', 'solution', 'fu_action', 'handled_by', 'status'];
+                
+                const dataToExport = selectedOnly 
+                    ? filteredEmails.filter((_, idx) => selectedRows.includes(idx))
+                    : filteredEmails;
+                
+                const data = dataToExport.map(ticket => {
+                    const row = {};
+                    headers.forEach(h => row[h] = ticket[h] || '');
+                    return row;
+                });
+                
+                const ws = XLSX.utils.json_to_sheet(data, { header: headers });
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Tickets');
+                
+                const dateRange = startDate && endDate 
+                    ? `${startDate}_to_${endDate}` 
+                    : startDate 
+                        ? `from_${startDate}` 
+                        : endDate 
+                            ? `until_${endDate}` 
+                            : 'all';
+                const filename = selectedOnly && selectedRows.length > 0
+                    ? `tickets_selected_${selectedRows.length}.xlsx`
+                    : `tickets_export_${dateRange}.xlsx`;
+                
+                XLSX.writeFile(wb, filename);
+            };
+
+            const handleDeleteSelected = async () => {
+                if (selectedRows.length === 0) {
+                    alert('No tickets selected');
+                    return;
+                }
+                if (!confirm(`Delete ${selectedRows.length} selected ticket(s)?`)) return;
+                
+                try {
+                    const res = await fetch('/api/bulk-delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            ticket_numbers: filteredEmails
+                                .filter((_, idx) => selectedRows.includes(idx))
+                                .map(t => t.ticket_number)
+                        }),
+                        credentials: 'include'
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        alert(`Deleted ${selectedRows.length} tickets`);
+                        setSelectedRows([]);
+                        loadTickets();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                } catch (e) {
+                    alert('Error deleting tickets');
+                }
+            };
+
+            const handleBulkStatusChange = async () => {
+                if (selectedRows.length === 0) {
+                    alert('No tickets selected');
+                    return;
+                }
+                const newStatus = prompt('Enter new status (completed/in progress):', 'completed');
+                if (!newStatus || !['completed', 'in progress'].includes(newStatus)) return;
+                
+                try {
+                    const res = await fetch('/api/bulk-status', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            ticket_numbers: filteredEmails
+                                .filter((_, idx) => selectedRows.includes(idx))
+                                .map(t => t.ticket_number),
+                            status: newStatus
+                        }),
+                        credentials: 'include'
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        alert(`Updated ${selectedRows.length} tickets to ${newStatus}`);
+                        setSelectedRows([]);
+                        loadTickets();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                } catch (e) {
+                    alert('Error updating status');
+                }
+            };
+
+            const handleUpdateTicket = (index, field, value) => {
+                const updatedEmails = [...emails];
+                const emailIndex = emails.findIndex(e => e === filteredEmails[index]);
+                updatedEmails[emailIndex] = { ...updatedEmails[emailIndex], [field]: value };
+                setEmails(updatedEmails);
+            };
+
+            const handleAutoSave = async (ticket) => {
+                try { await fetch('/update-ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ticket), credentials: 'include' }); } catch (error) { console.error(error); }
+            };
+
+            const handleSaveAll = async () => {
+                if (!confirm('Save all tickets to database?')) return;
+                setIsScanning(true);
+                try {
+                    for (const ticket of emails) { await fetch('/update-ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ticket), credentials: 'include' }); }
+                    alert('All tickets saved successfully!');
+                } catch (error) { alert('Error: ' + error.message); } 
+                finally { setIsScanning(false); }
+            };
+
+            const handleSort = (column) => {
+                if (sortColumn === column) setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                else { setSortColumn(column); setSortDirection('asc'); }
+            };
+
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        if (Array.isArray(json)) {
+                            const initializedData = json.map(ticket => ({
+                                ...ticket,
+                                problem: ticket.problem || '',
+                                resolve_time: ticket.resolve_time || '',
+                                ph_rm_os: ticket.ph_rm_os || '',
+                                solution: ticket.solution || '',
+                                fu_action: ticket.fu_action || '',
+                                handled_by: ticket.handled_by || 'USE_MISSING',
+                                assigned_to: ticket.assigned_to || '',
+                                username: ticket.username || '',
+                                phone: ticket.phone || '',
+                                status: ticket.status || 'in progress'
+                            }));
+                            setEmails(prev => [...initializedData, ...prev]);
+                            alert('Tickets loaded successfully!');
+                        }
+                    } catch (err) {
+                        alert('Invalid JSON file');
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            };
+
+            const handleSyncToDB = async () => {
+                try {
+                    const res = await fetch('/api/sync-db', { method: 'POST', credentials: 'include' });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        alert(`Sync complete!\nInserted: ${data.inserted}\nUpdated: ${data.updated}\nTotal: ${data.total}`);
+                    } else {
+                        alert('Sync failed: ' + data.message);
+                    }
+                } catch (err) { alert('Sync error: ' + err); }
+            };
+
+            const handleExportFromDB = async () => {
+                if (!confirm('Sync tickets from DB to JSON? Continue?')) return;
+                try {
+                    const res = await fetch('/api/sync-from-db', { method: 'POST', credentials: 'include' });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        alert(`Export complete!\n${data.message}`);
+                        loadTickets();
+                    } else {
+                        alert('Export failed: ' + data.message);
+                    }
+                } catch (err) { alert('Export error: ' + err); }
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 pb-20">
+                    {/* Primary Header */}
+                    <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                            <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
+                                <div className="flex items-center">
+                                    <div className="bg-blue-600 p-2 rounded-lg mr-3">
+                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl font-bold text-gray-900">IT Ticket Dashboard</h1>
+                                        <p className="text-xs text-gray-500 font-medium">Showing {filteredEmails.length} / {emails.length} tickets</p>
+                                    </div>
+                                </div>
+                                
+                                {/* Right Navigation Menu */}
+                                <div className="flex items-center space-x-2 flex-wrap justify-end">
+                                    {hasPermission('tickets_create') && (
+                                        <button onClick={() => setShowAddTicketModal(true)} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm text-sm font-medium hover:bg-indigo-700 transition">
+                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                                            Add Ticket
+                                        </button>
+                                    )}
+                                    
+                                    <label className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer transition">
+                                        <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                        Upload JSON
+                                        <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
+                                    </label>
+
+                                    <a href="BarChart.html" className="flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg shadow-sm text-sm font-medium hover:bg-orange-700 transition">
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                        Bar Chart
+                                    </a>
+
+                                    <a href="mobile.html" className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-sm text-sm font-medium hover:bg-green-700 transition">
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                        Mobile
+                                    </a>
+
+                                    {hasPermission('settings_access') && (
+                                        <a href="adminsettings.html" className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg shadow-sm text-sm font-medium hover:bg-gray-900 transition">
+                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                            Settings
+                                        </a>
+                                    )}
+
+                                    <a href="/logout" className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg shadow-sm text-sm font-medium hover:bg-red-700 transition">
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                        Logout
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                        {/* Stat Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6 mb-6">
+                            <StatCard title="Total" value={stats.total} icon={SVGIcons.mail} color={{bg: 'bg-gray-100', text: 'text-gray-600'}} />
+                            <StatCard title="Extracted" value={stats.extracted} icon={SVGIcons.check} color={{bg: 'bg-green-100', text: 'text-green-600'}} />
+                            <StatCard title="MX System" value={stats.mx} icon={SVGIcons.monitor} color={{bg: 'bg-blue-100', text: 'text-blue-600'}} />
+                            <StatCard title="CDC Tickets" value={stats.cdc} icon={SVGIcons.alert} color={{bg: 'bg-orange-100', text: 'text-orange-600'}} />
+                            <StatCard title="FW Tickets" value={stats.fw} icon={SVGIcons.bag} color={{bg: 'bg-purple-100', text: 'text-purple-600'}} />
+                        </div>
+
+                        {/* Control Panel Toolbar */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex flex-wrap lg:flex-nowrap justify-between items-center gap-6">
+                            <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3 w-full lg:w-auto">
+                                <span className="text-xs font-bold text-gray-500 uppercase w-full sm:w-auto mr-2">Email Tools</span>
+                                
+                                <button onClick={() => handleScan(false)} disabled={isScanning || autoScanEnabled} className={`flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium transition ${isScanning || autoScanEnabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                    {isScanning ? <div className="loading-spinner mr-2"></div> : <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>}
+                                    Scan Recent (50)
+                                </button>
+                                
+                                <button onClick={() => handleScan(true)} disabled={isScanning || autoScanEnabled} className={`flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium transition ${isScanning || autoScanEnabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                                    Scan All Emails
+                                </button>
+
+                                <button onClick={toggleAutoScan} className={`flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium transition ${autoScanEnabled ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                    <span className={`w-3 h-3 rounded-full mr-2 ${autoScanEnabled ? 'bg-white animate-pulse' : 'bg-blue-300'}`}></span>
+                                    Auto: {autoScanEnabled ? 'ON' : 'OFF'}
+                                </button>
+                            </div>
+
+                            <div className="hidden lg:block w-px h-8 bg-gray-200"></div>
+
+                            <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3 w-full lg:w-auto">
+                                <span className="text-xs font-bold text-gray-500 uppercase w-full sm:w-auto mr-2">Database Tools</span>
+                                
+                                <button onClick={handleSyncToDB} className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition">
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                                    Sync to DB
+                                </button>
+                                
+                                <button onClick={handleExportFromDB} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    Export from DB
+                                </button>
+                                
+                                <button onClick={handleSaveAll} disabled={isScanning} className={`flex items-center px-4 py-2 text-white rounded-lg text-sm font-medium transition ${isScanning ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}>
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                                    Save All
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Bulk Actions */}
+                        {selectedRows.length > 0 && (
+                            <div className="bg-blue-50 p-3 rounded-lg mb-4 flex flex-wrap items-center gap-3">
+                                <span className="text-sm font-medium text-blue-800">{selectedRows.length} selected</span>
+                                <button onClick={handleDeleteSelected} className="flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition">
+                                    {SVGIcons.trash}
+                                    Delete
+                                </button>
+                                <button onClick={() => handleExportXLSX(true)} className="flex items-center px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition">
+                                    {SVGIcons.download}
+                                    Export Selected
+                                </button>
+                                <button onClick={handleBulkStatusChange} className="flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+                                    {SVGIcons.checkcircle}
+                                    Change Status
+                                </button>
+                                <button onClick={() => setSelectedRows([])} className="text-sm text-gray-500 hover:text-gray-700">Clear selection</button>
+                            </div>
+                        )}
+
+                        {/* Search & Filters */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+                            <div className="relative w-full md:w-64">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    {SVGIcons.search}
+                                </div>
+                                <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Search ticket #, shop, desc..." />
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                                <span className="text-gray-500">to</span>
+                                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                            </div>
+                            
+                            <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-200">
+                                {['all', 'cdc', 'fw', 'mx'].map(type => (
+                                    <button key={type} onClick={() => setFilterType(type)} className={`px-4 py-1.5 text-sm font-semibold rounded-md capitalize transition ${filterType === type ? 'bg-white text-blue-700 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}>
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <button onClick={() => handleExportXLSX(false)} className="flex items-center px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-medium hover:bg-green-800 transition">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                Export XLSX
+                            </button>
+                        </div>
+
+                        {/* Table Render */}
+                        <TableView 
+                            tickets={filteredEmails}
+                            selectedRows={selectedRows}
+                            onRowSelect={(idx) => {
+                                if(idx === 'all') setSelectedRows(filteredEmails.map((_, i) => i));
+                                else if(idx === 'none') setSelectedRows([]);
+                                else setSelectedRows(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]);
+                            }}
+                            onRowClick={(index) => setSelectedTicketIndex(index)}
+                            onUpdateTicket={handleUpdateTicket} 
+                            onAutoSave={handleAutoSave}
+                            sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort}
+                        />
+                    </div>
+
+                    {selectedTicketIndex !== null && filteredEmails[selectedTicketIndex] && (
+                        <DetailModal 
+                            ticket={filteredEmails[selectedTicketIndex]}
+                            onClose={() => setSelectedTicketIndex(null)}
+                            onUpdate={(updatedTicket) => {
+                                const emailIndex = emails.findIndex(e => e === filteredEmails[selectedTicketIndex]);
+                                if (emailIndex !== -1) {
+                                    const newEmails = [...emails];
+                                    newEmails[emailIndex] = updatedTicket;
+                                    setEmails(newEmails);
+                                }
+                            }}
+                            onAutoSave={handleAutoSave}
+                        />
+                    )}
+
+                    {showAddTicketModal && (
+                        <AddTicketModal 
+                            onClose={() => setShowAddTicketModal(false)}
+                            onAdd={async (newTicket) => {
+                                const res = await fetch('/add-ticket', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(newTicket),
+                                    credentials: 'include'
+                                });
+                                const result = await res.json();
+                                if (result.status === 'success') {
+                                    setEmails(prev => [result.ticket, ...prev]);
+                                    setShowAddTicketModal(false);
+                                    alert('Ticket added successfully!');
+                                } else {
+                                    alert('Error: ' + result.message);
+                                }
+                            }}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>IT Tickets Mobile</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+        .slide-in {
+            animation: slideIn 0.25s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to   { transform: translateX(0);    opacity: 1; }
+        }
+
+        .loading-spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 18px; height: 18px;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .ticket-row {
+            transition: background 0.15s;
+        }
+        .ticket-row:active { background: #eff6ff; }
+
+        input[type="datetime-local"],
+        input[type="text"],
+        textarea,
+        select {
+            font-size: 16px; /* prevent iOS zoom */
+        }
+
+        .status-btn { transition: all 0.15s; }
+        .status-btn:active { transform: scale(0.96); }
+    </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    /* ─── constants ─────────────────────────────────────── */
+    const PROBLEM_OPTIONS = [
+        "pos issue",
+        "printer issue",
+        "screen issue",
+        "kds issue",
+        "Windows OS Time/Bios Time/TV time issue",
+        "wrong order",
+        "network issue",
+        "hardware issue",
+        "software issue",
+        "shop using imean issue",
+        "tv/hdmi issue",
+        "pos sync issue",
+        "menuphoto issue",
+        "power issue"
+    ];
+    const HANDLER_OPTIONS = ["CC", "TW", "TS", "TC", "HA", "GL", "NT"];
+
+    /* ─── tiny icon wrapper ──────────────────────────────── */
+    const Icon = ({ name, className }) => {
+        const ref = useRef(null);
+        useEffect(() => {
+            if (ref.current && lucide.icons[name]) {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('width', '20'); svg.setAttribute('height', '20');
+                svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '2');
+                svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
+                if (className) svg.setAttribute('class', className);
+                lucide.icons[name].forEach(([tag, attrs]) => {
+                    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+                    Object.keys(attrs).forEach(k => el.setAttribute(k, attrs[k]));
+                    svg.appendChild(el);
+                });
+                ref.current.innerHTML = '';
+                ref.current.appendChild(svg);
+            }
+        }, [name, className]);
+        return <span ref={ref} className="inline-flex items-center justify-center" />;
+    };
+
+    /* ─── type badge ─────────────────────────────────────── */
+    const TypeBadge = ({ ticketNumber }) => {
+        if (!ticketNumber) return <span className="px-2 py-0.5 rounded text-xs font-bold bg-gray-100 text-gray-500">No ID</span>;
+        if (ticketNumber.startsWith('BZ'))
+            return <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700">MX</span>;
+        if (ticketNumber.startsWith('HK') || ticketNumber.startsWith('CDC') || ticketNumber.startsWith('IN'))
+            return <span className="px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-700">CDC</span>;
+        if (ticketNumber.startsWith('FW') || ticketNumber.startsWith('ITD'))
+            return <span className="px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">FW</span>;
+        return <span className="px-2 py-0.5 rounded text-xs font-bold bg-gray-100 text-gray-600">Other</span>;
+    };
+
+    /* ─── status pill ────────────────────────────────────── */
+    const StatusPill = ({ status }) => {
+        const done = status === 'completed';
+        return (
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${done ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                {done ? 'Done' : 'In Progress'}
+            </span>
+        );
+    };
+
+    /* ─── ticket list row ────────────────────────────────── */
+    const TicketRow = ({ ticket, onClick }) => (
+        <div
+            className="ticket-row bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 cursor-pointer active:bg-blue-50"
+            onClick={() => onClick(ticket)}
+        >
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                    <TypeBadge ticketNumber={ticket.ticket_number} />
+                    <span className="text-sm font-semibold text-gray-800 truncate">
+                        {ticket.ticket_number || '(No Ticket #)'}
+                    </span>
+                    <span className="ml-auto flex-shrink-0">
+                        <StatusPill status={ticket.status} />
+                    </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="font-medium text-gray-700">{ticket.shop || '—'}</span>
+                    <span className="text-gray-300">·</span>
+                    <span>{ticket.date || '—'}</span>
+                </div>
+                <p className="text-xs text-gray-500 truncate mt-0.5">{ticket.description || '—'}</p>
+                {ticket.address && (
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(ticket.address);
+                        }}
+                        className="text-xs text-blue-600 font-medium hover:underline mt-0.5 flex items-center gap-1"
+                        title="Click to copy address"
+                    >
+                        <Icon name="map-pin" className="w-3 h-3" />
+                        <span className="truncate max-w-[200px]">{ticket.address}</span>
+                        <Icon name="copy" className="w-3 h-3" />
+                    </button>
+                )}
+                <div className="flex justify-between mt-0.5">
+                    <span className="text-xs text-gray-400">{ticket.username ? `@${ticket.username}` : ''}</span>
+                    {ticket.phone ? (
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(ticket.phone);
+                            }}
+                            className="text-xs text-blue-600 font-medium hover:underline"
+                            title="Click to copy phone"
+                        >
+                            📞 {ticket.phone}
+                        </button>
+                    ) : null}
+                    {ticket.assigned_to && (
+                        <span className="text-xs text-blue-600">→ {ticket.assigned_to}</span>
+                    )}
+                </div>
+            </div>
+            {ticket.status === 'completed' && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        let bodyText;
+                        if (ticket.fu_action) {
+                            const msgType = confirm('OK = Solution, Cancel = F/U Action') ? 'solution' : 'fu_action';
+                            bodyText = msgType === 'fu_action' ? ticket.fu_action : (ticket.solution || 'No solution');
+                        } else {
+                            bodyText = ticket.solution || 'No solution';
+                        }
+                        const supportType = ticket.ph_rm_os === 'P' ? 'Phone Support' : ticket.ph_rm_os === 'R' ? 'Remote Support' : ticket.ph_rm_os === 'O' ? 'Onsite Support' : '';
+                        const message = `${ticket.shop}\n${supportType}\n${bodyText}`;
+                        navigator.clipboard.writeText(message);
+                    }}
+                    className="p-2 text-green-600 flex-shrink-0"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                </button>
+            )}
+            <Icon name="chevron-right" className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        </div>
+    );
+
+    /* ─── edit / detail page ─────────────────────────────── */
+    const EditPage = ({ ticket, onBack, onSave }) => {
+        const [form, setForm] = useState({ ...ticket });
+        const [saving, setSaving] = useState(false);
+        const [saveStatus, setSaveStatus] = useState(null); // null | 'ok' | 'err'
+
+        const set = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
+
+        const currentHandlers = (form.handled_by || '').split(',').filter(Boolean);
+        const toggleHandler = (opt) => {
+            const next = currentHandlers.includes(opt)
+                ? currentHandlers.filter(h => h !== opt)
+                : [...currentHandlers, opt];
+            set('handled_by', next.join(','));
+        };
+
+        const handleSave = async () => {
+            setSaving(true);
+            setSaveStatus(null);
+            try {
+                const res = await fetch('/update-ticket', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(form),
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    setSaveStatus('ok');
+                    onSave(form);
+                    setTimeout(onBack, 600);
+                } else {
+                    setSaveStatus('err');
+                }
+            } catch {
+                setSaveStatus('err');
+            } finally {
+                setSaving(false);
+            }
+        };
+
+        const handleSaveWithData = async (ticketData) => {
+            setSaving(true);
+            setSaveStatus(null);
+            try {
+                const res = await fetch('/update-ticket', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ticketData),
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    setSaveStatus('ok');
+                    onSave(ticketData);
+                } else {
+                    setSaveStatus('err');
+                }
+            } catch {
+                setSaveStatus('err');
+            } finally {
+                setSaving(false);
+            }
+        };
+
+        return (
+            <div className="fixed inset-0 bg-gray-50 flex flex-col slide-in" style={{ zIndex: 50 }}>
+                {/* Header */}
+                <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0" style={{ zIndex: 10 }}>
+                    <button onClick={onBack} className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 font-bold text-xl">
+                        &lt;
+                    </button>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                            <TypeBadge ticketNumber={form.ticket_number} />
+                            <span className="text-sm font-bold text-gray-800 truncate">{form.ticket_number || '(No Ticket #)'}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 truncate">{form.shop} · {form.date}</p>
+                    </div>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition ${
+                            saveStatus === 'ok' ? 'bg-green-500' :
+                            saveStatus === 'err' ? 'bg-red-500' :
+                            'bg-blue-600 active:bg-blue-700'
+                        } disabled:opacity-60`}
+                    >
+                        {saving ? <span className="loading-spinner" /> : saveStatus === 'ok' ? 'Saved!' : saveStatus === 'err' ? 'Error' : 'Save'}
+                    </button>
+                    {saveStatus === 'ok' && (
+                        <button
+                            onClick={() => {
+                                const msgType = confirm('Click OK for Solution, Cancel for F/U Action') ? 'solution' : 'fu_action';
+                                const bodyText = msgType === 'fu_action' && form.fu_action ? form.fu_action : (form.solution || 'No solution recorded');
+                                const supportType = form.ph_rm_os === 'P' ? 'Phone Support' : form.ph_rm_os === 'R' ? 'Remote Support' : form.ph_rm_os === 'O' ? 'Onsite Support' : '';
+                                const message = `${form.shop}\n${supportType}\n${bodyText}`;
+                                navigator.clipboard.writeText(message).then(() => {
+                                    alert('Copied to clipboard!');
+                                }).catch(() => {
+                                    alert(message);
+                                });
+                            }}
+                            className="px-3 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 transition"
+                        >
+                            Share
+                        </button>
+                    )}
+                </div>
+
+                {/* Read-only info strip */}
+                <div className="bg-blue-50 border-b border-blue-100 px-4 py-2">
+                    <p className="text-xs text-blue-700 font-medium line-clamp-2">{form.description || '—'}</p>
+                </div>
+
+                {/* Form */}
+                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+
+                    {/* Assigned To */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Assigned To</label>
+                        <select
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={form.assigned_to || ''}
+                            onChange={e => {
+                                set('assigned_to', e.target.value);
+                                handleSaveWithData({ ...form, assigned_to: e.target.value });
+                            }}
+                        >
+                            <option value="">-</option>
+                            {HANDLER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                    </div>
+
+                    {/* Problem */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Problem</label>
+                        <select
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={form.problem || ''}
+                            onChange={e => {
+                                set('problem', e.target.value);
+                                handleSaveWithData({ ...form, problem: e.target.value });
+                            }}
+                        >
+                            <option value="">Select problem type...</option>
+                            {PROBLEM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                    </div>
+
+                    {/* Resolve Time */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Resolve Time</label>
+                        <input
+                            type="datetime-local"
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={form.resolve_time || ''}
+                            onChange={e => set('resolve_time', e.target.value)}
+                        />
+                    </div>
+
+                    {/* PH/RM/OS */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">PH / RM / OS</label>
+                        <select
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={form.ph_rm_os || ''}
+                            onChange={e => set('ph_rm_os', e.target.value)}
+                        >
+                            <option value="">Select support type...</option>
+                            <option value="P">P - Phone Support</option>
+                            <option value="R">R - Remote Support</option>
+                            <option value="O">O - Onsite Support</option>
+                        </select>
+                    </div>
+
+                    {/* Solution */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Solution</label>
+                        <textarea
+                            rows={3}
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                            placeholder="Enter solution..."
+                            value={form.solution || ''}
+                            onChange={e => set('solution', e.target.value)}
+                        />
+                    </div>
+
+                    {/* F/U Action */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">F/U Action</label>
+                        <textarea
+                            rows={3}
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                            placeholder="Enter follow-up action..."
+                            value={form.fu_action || ''}
+                            onChange={e => set('fu_action', e.target.value)}
+                        />
+                    </div>
+
+                    {/* Handled By */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Handled By</label>
+                        <div className="flex flex-wrap gap-2">
+                            {HANDLER_OPTIONS.map(opt => {
+                                const checked = currentHandlers.includes(opt);
+                                return (
+                                    <button
+                                        key={opt}
+                                        onClick={() => toggleHandler(opt)}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition status-btn ${
+                                            checked
+                                                ? 'bg-blue-600 text-white border-blue-600'
+                                                : 'bg-white text-gray-700 border-gray-300'
+                                        }`}
+                                    >
+                                        {opt}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {currentHandlers.length === 0 && (
+                            <p className="text-xs text-gray-400 mt-1.5">No handler selected</p>
+                        )}
+                    </div>
+
+                    {/* Status */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Status</label>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    const updated = { ...form, status: 'in progress' };
+                                    set('status', 'in progress');
+                                    handleSaveWithData(updated);
+                                }}
+                                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition status-btn ${
+                                    form.status !== 'completed'
+                                        ? 'bg-yellow-400 text-white border-yellow-400'
+                                        : 'bg-white text-gray-600 border-gray-300'
+                                }`}
+                            >
+                                In Progress
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const updated = { ...form, status: 'completed' };
+                                    set('status', 'completed');
+                                    handleSaveWithData(updated);
+                                }}
+                                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition status-btn ${
+                                    form.status === 'completed'
+                                        ? 'bg-green-500 text-white border-green-500'
+                                        : 'bg-white text-gray-600 border-gray-300'
+                                }`}
+                            >
+                                Completed
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* bottom safe area */}
+                    <div className="h-8" />
+                </div>
+            </div>
+        );
+    };
+
+    /* ─── main app ───────────────────────────────────────── */
+    const App = () => {
+        const [tickets, setTickets]       = useState([]);
+        const [selected, setSelected]     = useState(null);
+        const [scanning, setScanning]     = useState(false);
+        const [search, setSearch]         = useState('');
+        const [filterStatus, setFilterStatus] = useState('all'); // all | progress | done
+        const [loading, setLoading]       = useState(true);
+        const [scanMsg, setScanMsg]       = useState(null);
+        const [currentTime, setCurrentTime] = useState(new Date());
+        const [timeOffset, setTimeOffset]   = useState(0);
+        const [autoScanEnabled, setAutoScanEnabled] = useState(false);
+        const [autoScanPolling, setAutoScanPolling] = useState(null);
+
+        /* sync time with server */
+        useEffect(() => {
+            const syncTime = async () => {
+                try {
+                    const res = await fetch('/api/stats', {credentials: 'include'});
+                    const data = await res.json();
+                    if (data.server_time) {
+                        const serverTime = new Date(data.server_time.replace(' ', 'T'));
+                        const localTime = new Date();
+                        setTimeOffset(serverTime.getTime() - localTime.getTime());
+                    }
+                } catch (e) {}
+            };
+            syncTime();
+            const interval = setInterval(syncTime, 60000);
+            return () => clearInterval(interval);
+        }, []);
+
+        /* update clock */
+        useEffect(() => {
+            const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+            return () => clearInterval(timer);
+        }, []);
+
+        const getSyncedTime = () => new Date(currentTime.getTime() + timeOffset);
+
+        /* load tickets on mount */
+        useEffect(() => {
+            loadTickets();
+        }, []);
+
+        /* check auto-scan status */
+        useEffect(() => {
+            const checkAutoScan = async () => {
+                try {
+                    const res = await fetch('/api/auto-scan-status', {credentials: 'include'});
+                    if (res.ok) {
+                        const data = await res.json();
+                        setAutoScanEnabled(data.enabled);
+                    }
+                } catch (e) { }
+            };
+            checkAutoScan();
+        }, []);
+
+        /* auto-scan polling */
+        useEffect(() => {
+            if (autoScanEnabled) {
+                const pollOneEmail = async () => {
+                    try {
+                        const res = await fetch('/api/auto-scan/one', { method: 'POST', credentials: 'include' });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.new_email) {
+                                loadTickets();
+                            }
+                        }
+                    } catch (e) { }
+                };
+                const interval = setInterval(pollOneEmail, 5000);
+                setAutoScanPolling(interval);
+                return () => clearInterval(interval);
+            } else {
+                if (autoScanPolling) {
+                    clearInterval(autoScanPolling);
+                    setAutoScanPolling(null);
+                }
+            }
+        }, [autoScanEnabled]);
+
+        const toggleAutoScan = async () => {
+            try {
+                const newState = !autoScanEnabled;
+                const res = await fetch('/api/auto-scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: newState }),
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    setAutoScanEnabled(newState);
+                }
+            } catch (e) { }
+        };
+
+        const loadTickets = async () => {
+            setLoading(true);
+            try {
+                const res = await fetch('/database/ticket.json', {credentials: 'include'});
+                const data = await res.json();
+                setTickets(data.map(t => ({
+                    ...t,
+                    problem:     t.problem     || '',
+                    resolve_time: t.resolve_time || '',
+                    ph_rm_os:    t.ph_rm_os    || '',
+                    solution:    t.solution    || '',
+                    fu_action:   t.fu_action   || '',
+                    handled_by:  t.handled_by  || '',
+                    assigned_to: t.assigned_to || '',
+                    username:    t.username    || '',
+                    phone:       t.phone       || '',
+                    status:      t.status      || 'in progress'
+                })));
+            } catch {
+                /* server not up yet – silently ignore */
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const handleScan = async () => {
+            setScanning(true);
+            setScanMsg(null);
+            try {
+                const res  = await fetch('/run-scan', {credentials: 'include'});
+                const data = await res.json();
+                if (data.status === 'success') {
+                    setTickets(data.data.map(t => ({
+                        ...t,
+                        problem:     t.problem     || '',
+                        resolve_time: t.resolve_time || '',
+                        ph_rm_os:    t.ph_rm_os    || '',
+                        solution:    t.solution    || '',
+                        fu_action:   t.fu_action   || '',
+                        handled_by:  t.handled_by  || '',
+                        assigned_to: t.assigned_to || '',
+                        username:    t.username    || '',
+                        phone:       t.phone       || '',
+                        status:      t.status      || 'in progress'
+                    })));
+                    setScanMsg(`Found ${data.data.length} tickets`);
+                } else {
+                    setScanMsg('Scan failed');
+                }
+            } catch {
+                setScanMsg('Server unreachable');
+            } finally {
+                setScanning(false);
+                setTimeout(() => setScanMsg(null), 3000);
+            }
+        };
+
+        const handleSave = (updated) => {
+            setTickets(prev => prev.map(t =>
+                (t.ticket_number === updated.ticket_number) ? updated : t
+            ));
+        };
+
+        /* filter + search */
+        const filtered = tickets.filter(t => {
+            const q = search.toLowerCase();
+            const matchSearch = !q ||
+                (t.ticket_number || '').toLowerCase().includes(q) ||
+                (t.shop          || '').toLowerCase().includes(q) ||
+                (t.description   || '').toLowerCase().includes(q);
+            const matchStatus =
+                filterStatus === 'all'      ? true :
+                filterStatus === 'progress' ? t.status !== 'completed' :
+                                              t.status === 'completed';
+            return matchSearch && matchStatus;
+        });
+
+        const counts = {
+            all:      tickets.length,
+            progress: tickets.filter(t => t.status !== 'completed').length,
+            done:     tickets.filter(t => t.status === 'completed').length,
+        };
+
+        if (selected) {
+            return (
+                <EditPage
+                    ticket={selected}
+                    onBack={() => setSelected(null)}
+                    onSave={handleSave}
+                />
+            );
+        }
+
+        return (
+            <div className="flex flex-col min-h-screen bg-gray-50">
+
+                {/* ── Top bar ── */}
+                <div className="bg-white border-b border-gray-200 px-4 pt-3 pb-2 sticky top-0" style={{ zIndex: 20 }}>
+                    <div className="flex items-center justify-between mb-2">
+                        <div>
+                            <h1 className="text-lg font-bold text-gray-900 leading-tight">IT Tickets</h1>
+                            <p className="text-xs text-gray-400">{counts.all} total · {counts.progress} open</p>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-lg font-mono font-bold text-blue-600">
+                                {getSyncedTime().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </div>
+                            <div className="text-xs text-gray-400">{getSyncedTime().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div></div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleScan}
+                                disabled={scanning || autoScanEnabled}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition ${scanning || autoScanEnabled ? 'bg-gray-400 text-white' : 'bg-blue-600 text-white active:bg-blue-700'}`}
+                            >
+                                {scanning
+                                    ? <span className="loading-spinner" />
+                                    : <Icon name="refresh-cw" className="w-4 h-4 text-white" />}
+                                {scanning ? 'Scanning...' : 'Scan'}
+                            </button>
+                            <button
+                                onClick={toggleAutoScan}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition ${autoScanEnabled ? 'bg-red-600 text-white active:bg-red-700' : 'bg-green-600 text-white active:bg-green-700'}`}
+                            >
+                                <span className={`w-2 h-2 rounded-full ${autoScanEnabled ? 'bg-white animate-pulse' : 'bg-green-300'}`}></span>
+                                {autoScanEnabled ? 'Auto' : 'Auto'}
+                            </button>
+                            <a
+                                href="/logout"
+                                className="flex items-center gap-1.5 px-3 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold active:bg-red-700 transition"
+                            >
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+
+                    {/* Search */}
+                    <div className="relative mb-3">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                            <Icon name="search" className="w-4 h-4" />
+                        </span>
+                        <input
+                            type="text"
+                            placeholder="Search ticket, shop, description..."
+                            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                        {search && (
+                            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                <Icon name="x" className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Status filter tabs */}
+                    <div className="flex border-b border-gray-100">
+                        {[
+                            { key: 'all',      label: 'All',      count: counts.all      },
+                            { key: 'progress', label: 'Open',     count: counts.progress },
+                            { key: 'done',     label: 'Done',     count: counts.done     },
+                        ].map(tab => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setFilterStatus(tab.key)}
+                                className={`flex-1 pb-2 text-sm font-medium border-b-2 transition ${
+                                    filterStatus === tab.key
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-500'
+                                }`}
+                            >
+                                {tab.label}
+                                <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
+                                    filterStatus === tab.key ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
+                                }`}>{tab.count}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* scan msg toast */}
+                {scanMsg && (
+                    <div className="mx-4 mt-3 px-4 py-2 bg-gray-800 text-white text-sm rounded-xl text-center">
+                        {scanMsg}
+                    </div>
+                )}
+
+                {/* ── Ticket list ── */}
+                <div className="flex-1 overflow-y-auto">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                            <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-3" />
+                            <p className="text-sm">Loading tickets...</p>
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                            <Icon name="inbox" className="w-12 h-12 text-gray-300 mb-3" />
+                            <p className="text-sm font-medium">No tickets found</p>
+                            {search && <p className="text-xs mt-1">Try a different search term</p>}
+                        </div>
+                    ) : (
+                        <div>
+                            {filtered.map((ticket, i) => (
+                                <TicketRow
+                                    key={ticket.ticket_number || i}
+                                    ticket={ticket}
+                                    onClick={setSelected}
+                                />
+                            ))}
+                            <div className="py-6 text-center text-xs text-gray-300">{filtered.length} tickets</div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

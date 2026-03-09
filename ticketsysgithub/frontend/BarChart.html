@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tickets by Site - Bar Chart</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        body { background-color: #f3f4f6; }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen">
+        <!-- Header -->
+        <div class="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                <!-- Row 1: Title and nav -->
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center">
+                        <div class="bg-blue-600 p-2 rounded-lg mr-3">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-900">Tickets Chart</h1>
+                            <p class="text-xs text-gray-500">Ticket analytics by site or shop</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <a href="dashboard.html" class="flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                            Dashboard
+                        </a>
+                        <a href="adminsettings.html" class="flex items-center px-3 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 transition">
+                            Settings
+                        </a>
+                        <a href="/logout" class="flex items-center px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition">
+                            Logout
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Row 2: Controls -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="bg-gray-100 p-1 rounded-lg flex">
+                        <button onclick="setMode(1)" id="mode1Btn" class="flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium transition">
+                            By Site
+                        </button>
+                        <button onclick="setMode(2)" id="mode2Btn" class="flex items-center px-3 py-1.5 text-gray-600 hover:bg-gray-200 rounded-md text-sm font-medium transition">
+                            By Shop
+                        </button>
+                    </div>
+                    
+                    <div id="siteFilterContainer" class="hidden flex items-center space-x-1">
+                        <button onclick="setSiteFilter('all')" id="filterAll" class="px-2 py-1 bg-blue-600 text-white rounded text-xs font-medium">All</button>
+                        <button onclick="setSiteFilter('CDC')" id="filterCDC" class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300">CDC</button>
+                        <button onclick="setSiteFilter('MX')" id="filterMX" class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300">MX</button>
+                        <button onclick="setSiteFilter('FW')" id="filterFW" class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300">FW</button>
+                        <button onclick="setSiteFilter('OTHER')" id="filterOTHER" class="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300">Other</button>
+                    </div>
+                    
+                    <div class="h-4 w-px bg-gray-300"></div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <input type="date" id="startDate" class="px-2 py-1 border border-gray-300 rounded text-sm">
+                        <span class="text-gray-500 text-sm">to</span>
+                        <input type="date" id="endDate" class="px-2 py-1 border border-gray-300 rounded text-sm">
+                        <button onclick="applyDateFilter()" class="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700">
+                            Filter
+                        </button>
+                        <button onclick="clearDateFilter()" class="px-3 py-1 bg-gray-500 text-white rounded text-sm font-medium hover:bg-gray-600">
+                            Clear
+                        </button>
+                    </div>
+                    
+                    <div class="h-4 w-px bg-gray-300"></div>
+                    
+                    <button onclick="loadData()" class="flex items-center px-3 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+            <!-- Stats Cards -->
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div id="filterStatus" class="hidden mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center">
+                    <svg class="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                    </svg>
+                    <span class="text-sm text-blue-700" id="filterStatusText"></span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-sm text-gray-500 font-medium" id="totalShopsLabel">Total Sites</p>
+                    <h3 class="text-2xl font-bold text-gray-800" id="totalShops">0</h3>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-sm text-gray-500 font-medium">Total Tickets</p>
+                    <h3 class="text-2xl font-bold text-gray-800" id="totalTickets">0</h3>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <p class="text-sm text-gray-500 font-medium" id="avgTicketsLabel">Avg Tickets per Site</p>
+                    <h3 class="text-2xl font-bold text-gray-800" id="avgTickets">0</h3>
+                </div>
+            </div>
+
+            <!-- Chart Container -->
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4" id="chartTitle">Tickets by Site</h2>
+                <div class="relative h-96">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Shops Table -->
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4" id="tableTitle">Tickets by Site</h2>
+                <div class="overflow-x-auto" style="max-height: 400px; overflow-y: auto;">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b border-gray-200 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Rank</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Site</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ticket Count</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200" id="topShopsTable">
+                            <tr>
+                                <td colspan="4" class="px-4 py-8 text-center text-gray-500">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let barChart = null;
+        let allTickets = [];
+        let currentMode = 2;
+        let currentSiteFilter = 'all';
+
+        function getTodayDate() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function getFirstDayOfMonth() {
+            const today = new Date();
+            return new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        }
+
+        async function loadData() {
+            try {
+                // Set default date range to current month
+                document.getElementById('startDate').value = getFirstDayOfMonth();
+                document.getElementById('endDate').value = getTodayDate();
+                
+                const response = await fetch('/database/ticket.json', {credentials: 'include'});
+                const tickets = await response.json();
+                allTickets = tickets;
+                
+                // Set default mode to by shop
+                setMode(2);
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Error loading data. Make sure the server is running.');
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            const mode1Btn = document.getElementById('mode1Btn');
+            const mode2Btn = document.getElementById('mode2Btn');
+            const siteFilterContainer = document.getElementById('siteFilterContainer');
+            
+            if (mode === 1) {
+                mode1Btn.className = 'flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium transition';
+                mode2Btn.className = 'flex items-center px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-md text-sm font-medium transition';
+                siteFilterContainer.classList.add('hidden');
+            } else {
+                mode1Btn.className = 'flex items-center px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-md text-sm font-medium transition';
+                mode2Btn.className = 'flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium transition';
+                siteFilterContainer.classList.remove('hidden');
+                setSiteFilter('all');
+            }
+            
+            applyDateFilter();
+        }
+
+        function setSiteFilter(site) {
+            currentSiteFilter = site;
+            
+            // Update button styles
+            const buttons = ['filterAll', 'filterCDC', 'filterMX', 'filterFW', 'filterOTHER'];
+            buttons.forEach(id => {
+                const btn = document.getElementById(id);
+                if (id === 'filter' + site) {
+                    btn.className = 'px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium';
+                } else {
+                    btn.className = 'px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300';
+                }
+            });
+            
+            applyDateFilter();
+        }
+
+        function applyDateFilter() {
+            const startDateInput = document.getElementById('startDate').value;
+            const endDateInput = document.getElementById('endDate').value;
+            
+            let filteredTickets = allTickets;
+            let hasFilter = false;
+            let filterText = '';
+            
+            if (startDateInput || endDateInput) {
+                filteredTickets = allTickets.filter(ticket => {
+                    const ticketDate = new Date(ticket.date);
+                    
+                    if (startDateInput && endDateInput) {
+                        const start = new Date(startDateInput);
+                        const end = new Date(endDateInput);
+                        end.setHours(23, 59, 59, 999);
+                        return ticketDate >= start && ticketDate <= end;
+                    } else if (startDateInput) {
+                        return ticketDate >= new Date(startDateInput);
+                    } else if (endDateInput) {
+                        const end = new Date(endDateInput);
+                        end.setHours(23, 59, 59, 999);
+                        return ticketDate <= end;
+                    }
+                    return true;
+                });
+                
+                hasFilter = true;
+                if (startDateInput && endDateInput) {
+                    filterText = `${startDateInput} to ${endDateInput}`;
+                } else if (startDateInput) {
+                    filterText = `From ${startDateInput}`;
+                } else if (endDateInput) {
+                    filterText = `Until ${endDateInput}`;
+                }
+            }
+            
+            const filterStatus = document.getElementById('filterStatus');
+            const filterStatusText = document.getElementById('filterStatusText');
+            
+            if (currentMode === 2 && currentSiteFilter !== 'all') {
+                hasFilter = true;
+                const siteText = `Site: ${currentSiteFilter}`;
+                if (filterText) {
+                    filterText += ` | ${siteText}`;
+                } else {
+                    filterText = siteText;
+                }
+            }
+            
+            if (hasFilter) {
+                filterStatus.classList.remove('hidden');
+                filterStatusText.textContent = `Filtered: ${filterText} (${filteredTickets.length} tickets)`;
+            } else {
+                filterStatus.classList.add('hidden');
+            }
+            
+            processTickets(filteredTickets);
+        }
+
+        function clearDateFilter() {
+            document.getElementById('startDate').value = getFirstDayOfMonth();
+            document.getElementById('endDate').value = getTodayDate();
+            currentSiteFilter = 'all';
+            setSiteFilter('all');
+            document.getElementById('filterStatus').classList.add('hidden');
+            processTickets(allTickets);
+        }
+
+        function processTickets(tickets) {
+            if (currentMode === 1) {
+                processBySite(tickets);
+            } else {
+                processByShop(tickets);
+            }
+        }
+
+        function processBySite(tickets) {
+            const siteCounts = {
+                'CDC': 0,
+                'MX': 0,
+                'FW': 0,
+                'OTHER': 0
+            };
+            
+            const siteDetails = {
+                'CDC': {},
+                'MX': {},
+                'FW': {},
+                'OTHER': {}
+            };
+            
+            tickets.forEach(ticket => {
+                let shop = (ticket.shop || '').toLowerCase().trim();
+                if (!shop || shop === 'unknown' || shop === 'n/a') {
+                    shop = 'ss999'; // Treat unknown as OTHER
+                }
+                let site = 'OTHER';
+                let displayKey = shop.toUpperCase();
+                
+                if (shop.startsWith('ik')) {
+                    site = 'IK';
+                } else if (shop.startsWith('cdc')) {
+                    site = 'CDC';
+                } else if (shop.startsWith('mx')) {
+                    site = 'MX';
+                } else if (shop.startsWith('fw')) {
+                    site = 'FW';
+                }
+                siteCounts[site]++;
+                
+                siteDetails[site][displayKey] = (siteDetails[site][displayKey] || 0) + 1;
+            });
+            
+            const sortedSites = Object.entries(siteCounts)
+                .sort((a, b) => b[1] - a[1]);
+            
+            const totalSites = sortedSites.filter(([, count]) => count > 0).length;
+            const totalTickets = tickets.length;
+            const avgTickets = totalSites > 0 ? (totalTickets / totalSites).toFixed(1) : 0;
+            
+            document.getElementById('totalShops').textContent = totalSites;
+            document.getElementById('totalTickets').textContent = totalTickets;
+            document.getElementById('avgTickets').textContent = avgTickets;
+            document.getElementById('totalShopsLabel').textContent = 'Total Sites';
+            document.getElementById('avgTicketsLabel').textContent = 'Avg Tickets per Site';
+            document.getElementById('chartTitle').textContent = 'Tickets by Site';
+            document.getElementById('tableTitle').textContent = 'Tickets by Site';
+            
+            updateChart(sortedSites, siteDetails, true);
+            updateTable(sortedSites, siteDetails, totalTickets, true);
+        }
+
+        function processByShop(tickets) {
+            let filteredTickets = tickets;
+            
+            if (currentSiteFilter !== 'all') {
+                filteredTickets = tickets.filter(ticket => {
+                    let shop = (ticket.shop || '').toLowerCase().trim();
+                    if (!shop || shop === 'unknown' || shop === 'n/a') {
+                        shop = 'ss999';
+                    }
+                    let site = 'OTHER';
+                    if (shop.startsWith('ik')) site = 'IK';
+                    else if (shop.startsWith('cdc')) site = 'CDC';
+                    else if (shop.startsWith('mx')) site = 'MX';
+                    else if (shop.startsWith('fw')) site = 'FW';
+                    return site === currentSiteFilter;
+                });
+            }
+            
+            const shopCounts = {};
+            filteredTickets.forEach(ticket => {
+                let shop = (ticket.shop || '').toLowerCase().trim();
+                if (!shop) shop = 'ss999';
+                shopCounts[shop] = (shopCounts[shop] || 0) + 1;
+            });
+            
+            const sortedShops = Object.entries(shopCounts)
+                .sort((a, b) => b[1] - a[1]);
+            
+            const totalShops = sortedShops.length;
+            const totalTickets = filteredTickets.length;
+            const avgTickets = totalShops > 0 ? (totalTickets / totalShops).toFixed(1) : 0;
+            
+            const filterText = currentSiteFilter === 'all' ? '' : ` (${currentSiteFilter})`;
+            document.getElementById('totalShops').textContent = totalShops;
+            document.getElementById('totalTickets').textContent = totalTickets;
+            document.getElementById('avgTickets').textContent = avgTickets;
+            document.getElementById('totalShopsLabel').textContent = 'Total Shops';
+            document.getElementById('avgTicketsLabel').textContent = 'Avg Tickets per Shop';
+            document.getElementById('chartTitle').textContent = `Top 20 Shops${filterText} by Ticket Count`;
+            document.getElementById('tableTitle').textContent = `Top 10 Shops${filterText} by Ticket Count`;
+            
+            updateChart(sortedShops, {}, false);
+            updateTable(sortedShops, {}, totalTickets, false);
+        }
+
+        function updateChart(data, details, isBySite) {
+            const ctx = document.getElementById('barChart').getContext('2d');
+            
+            let labels, bgColors;
+            
+            if (isBySite) {
+                labels = data.map(([site]) => site);
+                const colors = {
+                    'CDC': 'hsl(210, 70%, 50%)',
+                    'MX': 'hsl(150, 70%, 50%)',
+                    'OTHER': 'hsl(30, 70%, 50%)'
+                };
+                colors['FW'] = 'hsl(270, 70%, 50%)';
+                bgColors = labels.map(site => colors[site] || 'hsl(0, 0%, 50%)');
+            } else {
+                const top20 = data.slice(0, 20);
+                labels = top20.map(([shop]) => shop.toUpperCase());
+                bgColors = labels.map((_, i) => {
+                    const hue = (i * 20) % 360;
+                    return `hsl(${hue}, 70%, 50%)`;
+                });
+            }
+            
+            const chartData = isBySite ? data.map(([, count]) => count) : data.slice(0, 20).map(([, count]) => count);
+            
+            if (barChart) {
+                barChart.destroy();
+            }
+            
+            barChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Number of Tickets',
+                        data: chartData,
+                        backgroundColor: bgColors,
+                        borderColor: bgColors.map(c => c.replace('50%', '40%')),
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    if (isBySite) {
+                                        const site = context.label;
+                                        const siteDetails = details[site];
+                                        const shopList = Object.entries(siteDetails)
+                                            .sort((a, b) => b[1] - a[1])
+                                            .map(([shop, count]) => `${shop}: ${count}`)
+                                            .join('\n');
+                                        return [context.parsed.y + ' tickets', '', 'By Shop:', shopList];
+                                    }
+                                    return context.parsed.y + ' tickets';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            },
+                            title: {
+                                display: true,
+                                text: 'Number of Tickets'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: isBySite ? 'Site' : 'Shop'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTable(data, details, totalTickets, isBySite) {
+            const tbody = document.getElementById('topShopsTable');
+            const dataWithCount = data.filter(([, count]) => count > 0);
+            
+            if (dataWithCount.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No data available</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            let rank = 1;
+            const top10 = dataWithCount.slice(0, 10);
+            
+            if (isBySite) {
+                top10.forEach(([site, count]) => {
+                    const percentage = ((count / totalTickets) * 100).toFixed(1);
+                    const shopDetails = details[site];
+                    const shopList = Object.entries(shopDetails)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([shop, shopCount]) => `${shop} (${shopCount})`)
+                        .join(', ');
+                    
+                    html += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900">#${rank}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700 font-medium">${site}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700">${count}</td>
+                            <td class="px-4 py-3 text-sm text-gray-500">${percentage}%</td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td colspan="4" class="px-4 py-2 text-xs text-gray-500">Shops: ${shopList}</td>
+                        </tr>
+                    `;
+                    rank++;
+                });
+            } else {
+                top10.forEach(([shop, count], index) => {
+                    const percentage = ((count / totalTickets) * 100).toFixed(1);
+                    html += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900">#${index + 1}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700 font-medium">${shop.toUpperCase()}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700">${count}</td>
+                            <td class="px-4 py-3 text-sm text-gray-500">${percentage}%</td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            tbody.innerHTML = html;
+        }
+
+        // Load data on page load
+        window.onload = loadData;
+    </script>
+</body>
+</html>

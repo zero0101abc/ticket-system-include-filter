@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Settings - IT Ticket System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        body { background-color: #f3f4f6; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .nav-item.active { background-color: #3b82f6; color: white; }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen flex">
+        <!-- Sidebar -->
+        <div class="w-64 bg-white border-r border-gray-200 min-h-screen">
+            <div class="p-4 border-b border-gray-200">
+                <h1 class="text-lg font-bold text-gray-800">Admin Settings</h1>
+                <p class="text-xs text-gray-500">System Configuration</p>
+            </div>
+            <nav class="p-2">
+                <button onclick="showSection('filters')" class="nav-item w-full flex items-center px-4 py-3 text-left text-gray-700 rounded-lg hover:bg-gray-100 transition">
+                    <i data-lucide="filter" class="w-5 h-5 mr-3"></i>
+                    Filter Management
+                </button>
+                <button onclick="showSection('sites')" class="nav-item w-full flex items-center px-4 py-3 text-left text-gray-700 rounded-lg hover:bg-gray-100 transition">
+                    <i data-lucide="map-pin" class="w-5 h-5 mr-3"></i>
+                    Site Management
+                </button>
+                <button onclick="showSection('scan')" class="nav-item w-full flex items-center px-4 py-3 text-left text-gray-700 rounded-lg hover:bg-gray-100 transition">
+                    <i data-lucide="mail-search" class="w-5 h-5 mr-3"></i>
+                    Email Scan
+                </button>
+                <button onclick="showSection('tickets')" class="nav-item w-full flex items-center px-4 py-3 text-left text-gray-700 rounded-lg hover:bg-gray-100 transition">
+                    <i data-lucide="ticket" class="w-5 h-5 mr-3"></i>
+                    Ticket Settings
+                </button>
+                <button onclick="showSection('data')" class="nav-item w-full flex items-center px-4 py-3 text-left text-gray-700 rounded-lg hover:bg-gray-100 transition">
+                    <i data-lucide="database" class="w-5 h-5 mr-3"></i>
+                    Data Management
+                </button>
+                <button onclick="showSection('users')" class="nav-item w-full flex items-center px-4 py-3 text-left text-gray-700 rounded-lg hover:bg-gray-100 transition">
+                    <i data-lucide="users" class="w-5 h-5 mr-3"></i>
+                    User Management
+                </button>
+                <button onclick="showSection('system')" class="nav-item w-full flex items-center px-4 py-3 text-left text-gray-700 rounded-lg hover:bg-gray-100 transition">
+                    <i data-lucide="info" class="w-5 h-5 mr-3"></i>
+                    System Info
+                </button>
+            </nav>
+            <div class="absolute bottom-0 w-64 p-4 border-t border-gray-200">
+                <a href="dashboard.html" class="flex items-center justify-center w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                    <i data-lucide="home" class="w-4 h-4 mr-2"></i>
+                    Back to Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 p-8">
+            <!-- Filter Management Section -->
+            <div id="section-filters" class="section active">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Filter Management</h2>
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">Email Filters</h3>
+                        <button onclick="openFilterModal()" class="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                            <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
+                            Add Filter
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">ID</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">From Email</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Subject Filter</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Action</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="filtersTable" class="divide-y divide-gray-200">
+                                <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-blue-800 mb-2">Available Actions</h4>
+                    <p class="text-sm text-blue-700">extract_cdc, send_mx_alert, urgent_mx_notification, process_health_data, log_cdc_data</p>
+                </div>
+            </div>
+
+            <!-- Email Scan Section -->
+            <div id="section-scan" class="section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Email Scan Controls</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="bg-blue-100 p-3 rounded-lg mr-4">
+                                <i data-lucide="zap" class="w-6 h-6 text-blue-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">Quick Scan</h3>
+                                <p class="text-sm text-gray-500">Scan 50 most recent emails</p>
+                            </div>
+                        </div>
+                        <button onclick="runScan('quick')" id="quickScanBtn" class="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                            <i data-lucide="play" class="w-4 h-4 mr-2"></i>
+                            Start Quick Scan
+                        </button>
+                        <p class="text-xs text-gray-500 mt-2 text-center">Estimated time: &lt;30 seconds</p>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="bg-purple-100 p-3 rounded-lg mr-4">
+                                <i data-lucide="hard-drive" class="w-6 h-6 text-purple-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">Full Scan</h3>
+                                <p class="text-sm text-gray-500">Scan ALL emails in mailbox</p>
+                            </div>
+                        </div>
+                        <button onclick="runScan('full')" id="fullScanBtn" class="w-full flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                            <i data-lucide="play" class="w-4 h-4 mr-2"></i>
+                            Start Full Scan
+                        </button>
+                        <p class="text-xs text-gray-500 mt-2 text-center">Estimated time: Several minutes</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Scan Options</h3>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="autoRefreshAfterScan" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                        <span class="ml-2 text-gray-700">Auto-refresh dashboard after scan completes</span>
+                    </label>
+                    <label class="flex items-center mt-3">
+                        <input type="checkbox" id="deleteAfterScan" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                        <span class="ml-2 text-gray-700">Delete emails automatically after reading (Auto-scan)</span>
+                    </label>
+                </div>
+
+                <div id="scanStatus" class="hidden mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div class="flex items-center">
+                        <div class="animate-spin mr-3">
+                            <i data-lucide="loader-2" class="w-5 h-5 text-green-600"></i>
+                        </div>
+                        <span id="scanStatusText" class="text-green-700">Scanning emails...</span>
+                    </div>
+                </div>
+
+                <div id="scanResult" class="hidden mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div class="flex items-center">
+                        <i data-lucide="check-circle" class="w-5 h-5 text-green-600 mr-2"></i>
+                        <span id="scanResultText" class="text-green-700"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ticket Settings Section -->
+            <div id="section-tickets" class="section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Ticket Settings</h2>
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Default Values</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Default Status</label>
+                            <select id="defaultStatus" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="in progress">In Progress</option>
+                                <option value="pending">Pending</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="closed">Closed</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Default Handler</label>
+                            <select id="defaultHandler" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="USE_MISSING">USE_MISSING</option>
+                                <option value="CC">CC</option>
+                                <option value="TW">TW</option>
+                                <option value="TS">TS</option>
+                                <option value="TC">TC</option>
+                                <option value="HA">HA</option>
+                                <option value="GL">GL</option>
+                                <option value="NT">NT</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Dashboard Auto-Refresh</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="autoRefreshEnabled" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                                <span class="ml-2 text-gray-700">Enable auto-refresh</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Refresh Interval</label>
+                            <select id="refreshInterval" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="30">30 seconds</option>
+                                <option value="60">1 minute</option>
+                                <option value="300">5 minutes</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="saveSettings()" class="mt-6 flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                    <i data-lucide="save" class="w-4 h-4 mr-2"></i>
+                    Save Settings
+                </button>
+            </div>
+
+            <!-- Data Management Section -->
+            <div id="section-data" class="section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Data Management</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="bg-green-100 p-3 rounded-lg mr-4">
+                                <i data-lucide="download" class="w-6 h-6 text-green-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">Export Tickets</h3>
+                                <p class="text-sm text-gray-500">Download all tickets as JSON, CSV or XLSX</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="exportData('tickets', 'json')" class="flex-1 flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm">
+                                <i data-lucide="download" class="w-4 h-4 mr-1"></i>
+                                JSON
+                            </button>
+                            <button onclick="exportData('tickets', 'csv')" class="flex-1 flex items-center justify-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4 mr-1"></i>
+                                CSV
+                            </button>
+                            <button onclick="exportData('tickets', 'xlsx')" class="flex-1 flex items-center justify-center px-3 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition text-sm">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4 mr-1"></i>
+                                XLSX
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="bg-blue-100 p-3 rounded-lg mr-4">
+                                <i data-lucide="mail" class="w-6 h-6 text-blue-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">Export Emails</h3>
+                                <p class="text-sm text-gray-500">Download cached emails as JSON</p>
+                            </div>
+                        </div>
+                        <button onclick="exportData('emails', 'json')" class="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                            <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                            Export Emails
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="bg-yellow-100 p-3 rounded-lg mr-4">
+                                <i data-lucide="archive" class="w-6 h-6 text-yellow-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">Create Backup</h3>
+                                <p class="text-sm text-gray-500">Backup tickets, filters, and emails</p>
+                            </div>
+                        </div>
+                        <button onclick="createBackup()" class="w-full flex items-center justify-center px-4 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition">
+                            <i data-lucide="archive" class="w-4 h-4 mr-2"></i>
+                            Create Backup
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="bg-red-100 p-3 rounded-lg mr-4">
+                                <i data-lucide="trash-2" class="w-6 h-6 text-red-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">Clear Data</h3>
+                                <p class="text-sm text-gray-500">Remove tickets or cached emails</p>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <button onclick="clearData('tickets')" class="w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                                <i data-lucide="trash" class="w-4 h-4 mr-2"></i>
+                                Clear All Tickets
+                            </button>
+                            <button onclick="clearData('emails')" class="w-full flex items-center justify-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition">
+                                <i data-lucide="trash" class="w-4 h-4 mr-2"></i>
+                                Clear Cached Emails
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Site Management Section -->
+            <div id="section-sites" class="section">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Site Management</h2>
+                    <button onclick="addSite()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow flex items-center transition">
+                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i> Add Site
+                    </button>
+                </div>
+                
+                <!-- Group Filter Buttons -->
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <button onclick="setGroupFilter('all')" id="btn-all" class="px-3 py-1.5 rounded text-sm font-medium bg-blue-600 text-white">All</button>
+                    <button onclick="setGroupFilter('CDC')" id="btn-CDC" class="px-3 py-1.5 rounded text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">CDC</button>
+                    <button onclick="setGroupFilter('FW')" id="btn-FW" class="px-3 py-1.5 rounded text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">FW</button>
+                    <button onclick="setGroupFilter('IH')" id="btn-IH" class="px-3 py-1.5 rounded text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">IH</button>
+                    <button onclick="setGroupFilter('IK')" id="btn-IK" class="px-3 py-1.5 rounded text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">IK</button>
+                    <button onclick="setGroupFilter('IT')" id="btn-IT" class="px-3 py-1.5 rounded text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">IT</button>
+                    <button onclick="setGroupFilter('MX')" id="btn-MX" class="px-3 py-1.5 rounded text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">MX</button>
+                    <button onclick="setGroupFilter('Others')" id="btn-Others" class="px-3 py-1.5 rounded text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">Others</button>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="mb-4">
+                    <input type="text" id="siteSearch" placeholder="Search by shop code, IP or address..." 
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                           oninput="handleSiteSearch()">
+                </div>
+                
+                <!-- Results Header -->
+                <div class="mb-2 text-sm text-gray-600">
+                    <span id="sitesCount">Loading...</span>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="overflow-x-auto max-h-[60vh]">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="sticky top-0 bg-white shadow-sm z-10">
+                                <tr class="bg-gray-50 text-gray-700 text-sm border-b">
+                                    <th class="p-4 font-semibold w-1/4">Shop Code</th>
+                                    <th class="p-4 font-semibold w-1/4">IP Address</th>
+                                    <th class="p-4 font-semibold w-2/4">Address</th>
+                                    <th class="p-4 font-semibold text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sitesTableBody" class="text-sm">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Management Section -->
+            <div id="section-users" class="section">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">User Management</h2>
+                    <button onclick="openUserModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow flex items-center transition">
+                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i> Add User
+                    </button>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50 text-gray-700 text-sm border-b">
+                            <tr>
+                                <th class="p-4 font-semibold">Username</th>
+                                <th class="p-4 font-semibold">Role</th>
+                                <th class="p-4 font-semibold">Created</th>
+                                <th class="p-4 font-semibold">Last Login</th>
+                                <th class="p-4 font-semibold text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody" class="text-sm">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- User Modal -->
+            <div id="userModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                    <h3 class="text-lg font-bold mb-4" id="userModalTitle">Add User</h3>
+                    <form id="userForm" onsubmit="saveUser(event)">
+                        <input type="hidden" id="userId" value="">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                            <input type="text" id="userUsername" required class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input type="password" id="userPassword" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <p class="text-xs text-gray-500 mt-1" id="passwordHint">Required for new user</p>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                            <select id="userRole" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="staff">Staff</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
+                            <div id="permissionsList" class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded p-2">
+                                <!-- Permissions will be loaded here -->
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" onclick="closeUserModal()" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- System Info Section -->
+            <div id="section-system" class="section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">System Info</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="bg-green-100 p-3 rounded-lg mr-4">
+                                <i data-lucide="check-circle" class="w-6 h-6 text-green-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Server Status</p>
+                                <h3 class="text-lg font-bold text-green-600">Running</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="bg-blue-100 p-3 rounded-lg mr-4">
+                                <i data-lucide="ticket" class="w-6 h-6 text-blue-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Total Tickets</p>
+                                <h3 class="text-lg font-bold text-gray-800" id="statTickets">0</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="bg-purple-100 p-3 rounded-lg mr-4">
+                                <i data-lucide="mail" class="w-6 h-6 text-purple-600"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Cached Emails</p>
+                                <h3 class="text-lg font-bold text-gray-800" id="statEmails">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Last Scan</h3>
+                    <p class="text-gray-700" id="lastScanTime">Never</p>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">About</h3>
+                    <p class="text-gray-600">IT Ticket Management System</p>
+                    <p class="text-sm text-gray-500">Version 1.0.0</p>
+                    <p class="text-sm text-gray-500 mt-2">Server running on port 8000</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Modal -->
+    <div id="filterModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" id="filterModalTitle">Add New Filter</h3>
+                <button onclick="closeFilterModal()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="filterForm" class="space-y-4">
+                <input type="hidden" id="filterId">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input type="text" id="filterName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">From Email</label>
+                    <input type="text" id="filterFromEmail" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject Filter</label>
+                    <input type="text" id="filterSubject" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder='contains(subject, "text")'>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Body Filter</label>
+                    <input type="text" id="filterBody" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">To Email</label>
+                    <input type="text" id="filterToEmail" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Action</label>
+                    <select id="filterAction" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select Action</option>
+                        <option value="extract_cdc">extract_cdc</option>
+                        <option value="send_mx_alert">send_mx_alert</option>
+                        <option value="urgent_mx_notification">urgent_mx_notification</option>
+                        <option value="process_health_data">process_health_data</option>
+                        <option value="log_cdc_data">log_cdc_data</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <input type="text" id="filterDescription" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="filterEnabled" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" checked>
+                        <span class="ml-2 text-gray-700">Enabled</span>
+                    </label>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeFilterModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let currentFilters = [];
+        let sitesList = [];
+        let allPermissions = [];
+
+        function showSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('section-' + section).classList.add('active');
+            event.target.closest('.nav-item')?.classList.add('active');
+            
+            if (section === 'filters') loadFilters();
+            if (section === 'sites') loadSites();
+            if (section === 'system') loadStats();
+            if (section === 'tickets') loadSettings();
+            if (section === 'users') {
+                loadUsers();
+                loadPermissions();
+            }
+        }
+
+        async function loadPermissions() {
+            try {
+                const res = await fetch('/api/permissions', {credentials: 'include'});
+                if (res.ok) {
+                    allPermissions = await res.json();
+                }
+            } catch (e) {
+                console.error('Error loading permissions:', e);
+            }
+        }
+
+        // User Management Functions
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/users', {credentials: 'include'});
+                if (res.status === 403) {
+                    document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-red-500">Admin access required</td></tr>';
+                    return;
+                }
+                const users = await res.json();
+                renderUsers(users);
+            } catch (e) {
+                console.error('Error loading users:', e);
+            }
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = users.map(user => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-4 font-medium">${user.username}</td>
+                    <td class="p-4">
+                        <span class="px-2 py-1 rounded text-xs font-medium ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
+                            ${user.role}
+                        </span>
+                    </td>
+                    <td class="p-4 text-gray-500 text-xs">${(user.permissions || []).slice(0, 3).join(', ')}${(user.permissions || []).length > 3 ? '...' : ''}</td>
+                    <td class="p-4 text-gray-500">${user.last_login || 'Never'}</td>
+                    <td class="p-4 text-right">
+                        <button onclick="editUser(${user.id}, '${user.username}', '${user.role}', ${JSON.stringify(user.permissions || []).replace(/"/g, '&quot;')})" class="text-blue-600 hover:text-blue-800 mr-3">
+                            <i data-lucide="edit-2" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="deleteUser(${user.id})" class="text-red-600 hover:text-red-800">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function renderPermissionsCheckboxes(selectedPermissions = []) {
+            const container = document.getElementById('permissionsList');
+            if (!container) return;
+            
+            // For admin, show all checked and disabled
+            const isAdmin = document.getElementById('userRole').value === 'admin';
+            
+            container.innerHTML = allPermissions.map(perm => `
+                <label class="flex items-center gap-2 text-sm ${isAdmin ? 'opacity-50' : ''}">
+                    <input type="checkbox" name="permission" value="${perm.id}" 
+                        ${isAdmin || selectedPermissions.includes('*') || selectedPermissions.includes(perm.id) ? 'checked' : ''}
+                        ${isAdmin ? 'disabled' : ''}>
+                    <span>${perm.name}</span>
+                </label>
+            `).join('');
+        }
+
+        function openUserModal(user = null) {
+            document.getElementById('userModal').classList.remove('hidden');
+            document.getElementById('userModalTitle').textContent = user ? 'Edit User' : 'Add User';
+            document.getElementById('userId').value = user ? user.id : '';
+            document.getElementById('userUsername').value = user ? user.username : '';
+            document.getElementById('userPassword').value = '';
+            document.getElementById('userRole').value = user ? user.role : 'staff';
+            document.getElementById('passwordHint').textContent = user ? 'Leave blank to keep current password' : 'Required';
+            
+            // Render permissions
+            const userPerms = user && user.permissions ? user.permissions : [];
+            renderPermissionsCheckboxes(userPerms);
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').classList.add('hidden');
+        }
+
+        function editUser(id, username, role, permissions) {
+            openUserModal({id, username, role, permissions});
+        }
+
+        document.getElementById('userRole').addEventListener('change', function() {
+            renderPermissionsCheckboxes([]);
+        });
+
+        async function saveUser(e) {
+            e.preventDefault();
+            const userId = document.getElementById('userId').value;
+            const username = document.getElementById('userUsername').value;
+            const password = document.getElementById('userPassword').value;
+            const role = document.getElementById('userRole').value;
+
+            // Get selected permissions
+            const selectedPerms = [];
+            document.querySelectorAll('input[name="permission"]:checked').forEach(cb => {
+                selectedPerms.push(cb.value);
+            });
+
+            // Admin gets all permissions (*)
+            const permissions = role === 'admin' ? ['*'] : selectedPerms;
+
+            const data = { username, role, permissions };
+            if (password) data.password = password;
+
+            try {
+                const url = userId ? `/api/users/${userId}` : '/api/users';
+                const method = userId ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    closeUserModal();
+                    loadUsers();
+                } else {
+                    const err = await res.json();
+                    alert(err.message || 'Error saving user');
+                }
+            } catch (e) {
+                alert('Error saving user: ' + e.message);
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Are you sure you want to delete this user?')) return;
+            try {
+                const res = await fetch(`/api/users/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    loadUsers();
+                } else {
+                    const err = await res.json();
+                    alert(err.message || 'Error deleting user');
+                }
+            } catch (e) {
+                alert('Error deleting user: ' + e.message);
+            }
+        }
+
+        async function loadFilters() {
+            try {
+                console.log('Loading filters from /api/filters...');
+                const res = await fetch('/api/filters', {credentials: 'include'});
+                console.log('Response status:', res.status);
+                currentFilters = await res.json();
+                console.log('Filters loaded:', currentFilters);
+                renderFilters();
+            } catch (e) {
+                console.error('Error loading filters:', e);
+                document.getElementById('filtersTable').innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-red-500">Error loading filters: ' + e.message + '</td></tr>';
+            }
+        }
+
+        function renderFilters() {
+            const tbody = document.getElementById('filtersTable');
+            if (currentFilters.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No filters found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = currentFilters.map(f => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm text-gray-700">${f.id}</td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-800">${f.name || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${f.from_email || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${f.subject_filter || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${f.action || '-'}</td>
+                    <td class="px-4 py-3">
+                        <button onclick="toggleFilter(${f.id})" class="px-2 py-1 text-xs rounded ${f.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
+                            ${f.enabled ? 'Enabled' : 'Disabled'}
+                        </button>
+                    </td>
+                    <td class="px-4 py-3">
+                        <button onclick="editFilter(${f.id})" class="text-blue-600 hover:text-blue-800 mr-3">
+                            <i data-lucide="edit" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="deleteFilter(${f.id})" class="text-red-600 hover:text-red-800">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // site management helpers
+        let currentGroupFilter = 'all';
+        let currentSearchText = '';
+        
+        async function loadSites() {
+            try {
+                const response = await fetch('/api/sites');
+                if (response.ok) {
+                    sitesList = await response.json();
+                    renderSites();
+                }
+            } catch (e) {
+                console.error("Failed to load sites", e);
+            }
+        }
+
+        function getGroupPrefix(shopCode) {
+            if (!shopCode) return 'Others';
+            const prefix = shopCode.match(/^[A-Za-z]+/);
+            if (!prefix) return 'Others';
+            const p = prefix[0].toUpperCase();
+            if (p === 'CDC') return 'CDC';
+            if (p === 'FW') return 'FW';
+            if (p === 'IH') return 'IH';
+            if (p === 'IK') return 'IK';
+            if (p === 'IT') return 'IT';
+            if (p === 'MX') return 'MX';
+            return 'Others';
+        }
+
+        function setGroupFilter(group) {
+            currentGroupFilter = group;
+            document.querySelectorAll('[id^="btn-"]').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+            });
+            const activeBtn = document.getElementById('btn-' + group);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-gray-200', 'text-gray-700');
+                activeBtn.classList.add('bg-blue-600', 'text-white');
+            }
+            renderSites();
+        }
+
+        function handleSiteSearch() {
+            currentSearchText = document.getElementById('siteSearch').value.toLowerCase().trim();
+            renderSites();
+        }
+
+        function sortSitesNullFirst(sites) {
+            return sites.sort((a, b) => {
+                const aEmpty = (!a.ip || !a.address || !a.shop_code);
+                const bEmpty = (!b.ip || !b.address || !b.shop_code);
+                
+                if (aEmpty && !bEmpty) return -1;
+                if (!aEmpty && bEmpty) return 1;
+                if (aEmpty && bEmpty) {
+                    return (a.shop_code || '').localeCompare(b.shop_code || '');
+                }
+                return (a.shop_code || '').localeCompare(b.shop_code || '');
+            });
+        }
+
+        function renderSites() {
+            const tbody = document.getElementById('sitesTableBody');
+            const countSpan = document.getElementById('sitesCount');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            
+            let filtered = sitesList;
+            
+            if (currentGroupFilter !== 'all') {
+                filtered = filtered.filter(site => getGroupPrefix(site.shop_code) === currentGroupFilter);
+            }
+            
+            if (currentSearchText) {
+                filtered = filtered.filter(site => 
+                    (site.shop_code || '').toLowerCase().includes(currentSearchText) ||
+                    (site.ip || '').toLowerCase().includes(currentSearchText) ||
+                    (site.address || '').toLowerCase().includes(currentSearchText)
+                );
+            }
+            
+            filtered = sortSitesNullFirst([...filtered]);
+            
+            const groupName = currentGroupFilter === 'all' ? 'All Sites' : currentGroupFilter;
+            countSpan.textContent = `Showing: ${groupName} (${filtered.length} sites)`;
+            
+            filtered.forEach((site) => {
+                const originalIndex = sitesList.indexOf(site);
+                const tr = document.createElement('tr');
+                tr.className = 'border-b hover:bg-gray-50 transition';
+                tr.innerHTML = `
+                    <td class="p-2">
+                        <input type="text" class="border border-gray-300 rounded p-2 w-full focus:ring-2 focus:ring-blue-500 outline-none" 
+                               value="${site.shop_code || ''}" onchange="updateSite(${originalIndex}, 'shop_code', this.value)">
+                    </td>
+                    <td class="p-2">
+                        <input type="text" class="border border-gray-300 rounded p-2 w-full focus:ring-2 focus:ring-blue-500 outline-none" 
+                               value="${site.ip || ''}" onchange="updateSite(${originalIndex}, 'ip', this.value)">
+                    </td>
+                    <td class="p-2">
+                        <input type="text" class="border border-gray-300 rounded p-2 w-full focus:ring-2 focus:ring-blue-500 outline-none" 
+                               value="${site.address || ''}" onchange="updateSite(${originalIndex}, 'address', this.value)">
+                    </td>
+                    <td class="p-2 text-right">
+                        <button onclick="deleteSite(${originalIndex})" class="text-red-500 hover:text-red-700 p-2 rounded hover:bg-red-50 transition">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function addSite() {
+            sitesList.push({ shop_code: '', ip: '', address: '' });
+            setGroupFilter('Others');
+            renderSites();
+            saveSites();
+        }
+
+        function updateSite(index, field, value) {
+            sitesList[index][field] = value;
+            saveSites();
+            renderSites();
+        }
+
+        function deleteSite(index) {
+            if (confirm('Delete this site configuration?')) {
+                sitesList.splice(index, 1);
+                renderSites();
+                saveSites();
+            }
+        }
+
+        async function saveSites() {
+            try {
+                await fetch('/api/sites', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sitesList)
+                });
+            } catch (e) {
+                console.error("Failed to save sites", e);
+            }
+        }
+
+        function openFilterModal(filter = null) {
+            document.getElementById('filterModal').classList.remove('hidden');
+            document.getElementById('filterModalTitle').textContent = filter ? 'Edit Filter' : 'Add New Filter';
+            document.getElementById('filterId').value = filter?.id || '';
+            document.getElementById('filterName').value = filter?.name || '';
+            document.getElementById('filterFromEmail').value = filter?.from_email || '';
+            document.getElementById('filterSubject').value = filter?.subject_filter || '';
+            document.getElementById('filterBody').value = filter?.body_filter || '';
+            document.getElementById('filterToEmail').value = filter?.to_email || '';
+            document.getElementById('filterAction').value = filter?.action || '';
+            document.getElementById('filterDescription').value = filter?.description || '';
+            document.getElementById('filterEnabled').checked = filter?.enabled !== false;
+        }
+
+        function closeFilterModal() {
+            document.getElementById('filterModal').classList.add('hidden');
+        }
+
+        function editFilter(id) {
+            const filter = currentFilters.find(f => f.id === id);
+            if (filter) openFilterModal(filter);
+        }
+
+        document.getElementById('filterForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('filterId').value;
+            const data = {
+                name: document.getElementById('filterName').value,
+                from_email: document.getElementById('filterFromEmail').value,
+                subject_filter: document.getElementById('filterSubject').value,
+                body_filter: document.getElementById('filterBody').value,
+                to_email: document.getElementById('filterToEmail').value,
+                action: document.getElementById('filterAction').value,
+                description: document.getElementById('filterDescription').value,
+                enabled: document.getElementById('filterEnabled').checked
+            };
+
+            if (id) {
+                await fetch(`/api/filters/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data),
+                    credentials: 'include'
+                });
+            } else {
+                await fetch('/api/filters', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data),
+                    credentials: 'include'
+                });
+            }
+            closeFilterModal();
+            loadFilters();
+        };
+
+        async function toggleFilter(id) {
+            const filter = currentFilters.find(f => f.id === id);
+            if (filter) {
+                await fetch(`/api/filters/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled: !filter.enabled}),
+                    credentials: 'include'
+                });
+                loadFilters();
+            }
+        }
+
+        async function deleteFilter(id) {
+            if (confirm('Are you sure you want to delete this filter?')) {
+                await fetch(`/api/filters/${id}`, {method: 'DELETE', credentials: 'include'});
+                loadFilters();
+            }
+        }
+
+        async function runScan(mode) {
+            const btn = mode === 'quick' ? document.getElementById('quickScanBtn') : document.getElementById('fullScanBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i> Scanning...';
+            lucide.createIcons();
+
+            document.getElementById('scanStatus').classList.remove('hidden');
+            document.getElementById('scanResult').classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({mode}),
+                    credentials: 'include'
+                });
+                const data = await res.json();
+
+                document.getElementById('scanStatus').classList.add('hidden');
+                document.getElementById('scanResult').classList.remove('hidden');
+                document.getElementById('scanResultText').textContent = data.message || 'Scan completed successfully!';
+
+                const autoRefresh = document.getElementById('autoRefreshAfterScan').checked;
+                if (autoRefresh) {
+                    setTimeout(() => window.location.href = 'dashboard.html', 2000);
+                }
+            } catch (e) {
+                document.getElementById('scanStatus').classList.add('hidden');
+                alert('Scan failed: ' + e.message);
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = mode === 'quick' 
+                ? '<i data-lucide="play" class="w-4 h-4 mr-2"></i> Start Quick Scan'
+                : '<i data-lucide="play" class="w-4 h-4 mr-2"></i> Start Full Scan';
+            lucide.createIcons();
+        }
+
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings', {credentials: 'include'});
+                const settings = await res.json();
+                document.getElementById('defaultStatus').value = settings.default_status || 'in progress';
+                document.getElementById('defaultHandler').value = settings.default_handler || 'USE_MISSING';
+                document.getElementById('autoRefreshEnabled').checked = settings.auto_refresh || false;
+                document.getElementById('refreshInterval').value = settings.refresh_interval || 60;
+                document.getElementById('autoRefreshAfterScan').checked = settings.auto_refresh_after_scan === 'true' || settings.auto_refresh_after_scan === true;
+                document.getElementById('deleteAfterScan').checked = settings.delete_after_scan === 'true' || settings.delete_after_scan === true;
+            } catch (e) {
+                console.error('Error loading settings:', e);
+            }
+        }
+
+        async function saveSettings() {
+            const settings = {
+                default_status: document.getElementById('defaultStatus').value,
+                default_handler: document.getElementById('defaultHandler').value,
+                auto_refresh: document.getElementById('autoRefreshEnabled').checked,
+                refresh_interval: parseInt(document.getElementById('refreshInterval').value),
+                auto_refresh_after_scan: document.getElementById('autoRefreshAfterScan').checked,
+                delete_after_scan: document.getElementById('deleteAfterScan').checked
+            };
+
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(settings),
+                credentials: 'include'
+            });
+            alert('Settings saved!');
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/stats', {credentials: 'include'});
+                const stats = await res.json();
+                document.getElementById('statTickets').textContent = stats.ticket_count || 0;
+                document.getElementById('statEmails').textContent = stats.email_count || 0;
+                document.getElementById('lastScanTime').textContent = stats.last_scan || 'Never';
+            } catch (e) {
+                console.error('Error loading stats:', e);
+            }
+        }
+
+        async function exportData(type, format = 'json') {
+            try {
+                const ticketRes = await fetch('/database/ticket.json', {credentials: 'include'});
+                const tickets = await ticketRes.json();
+                
+                let blob, filename;
+                
+                if (format === 'xlsx') {
+                    const headers = ['ticket_number', 'shop', 'ip', 'address', 'description', 'date', 'problem', 'resolve_time', 'ph_rm_os', 'solution', 'fu_action', 'handled_by', 'status'];
+                    const data = tickets.map(ticket => {
+                        const row = {};
+                        headers.forEach(h => row[h] = ticket[h] || '');
+                        return row;
+                    });
+                    const ws = XLSX.utils.json_to_sheet(data, { header: headers });
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Tickets');
+                    XLSX.writeFile(wb, 'tickets_export.xlsx');
+                    return;
+                } else if (format === 'csv') {
+                    const headers = ['ticket_number', 'shop', 'ip', 'address', 'description', 'date', 'problem', 'resolve_time', 'ph_rm_os', 'solution', 'fu_action', 'handled_by', 'status'];
+                    const csvRows = [headers.join(',')];
+                    
+                    tickets.forEach(ticket => {
+                        const row = headers.map(header => {
+                            const value = ticket[header] || '';
+                            const escaped = String(value).replace(/"/g, '""');
+                            return `"${escaped}"`;
+                        });
+                        csvRows.push(row.join(','));
+                    });
+                    
+                    blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                    filename = 'tickets_export.csv';
+                } else {
+                    blob = new Blob([JSON.stringify(tickets, null, 2)], { type: 'application/json' });
+                    filename = type === 'tickets' ? 'tickets_export.json' : 'emails_export.json';
+                }
+                
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert('Export failed: ' + e.message);
+            }
+        }
+
+        async function createBackup() {
+            if (confirm('Create a backup of all data?')) {
+                try {
+                    const res = await fetch('/api/backup', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    const result = await res.json();
+                    if (result.status === 'success') {
+                        alert(result.message || 'Backup created successfully!');
+                    } else {
+                        alert('Backup failed: ' + (result.message || 'Unknown error'));
+                    }
+                } catch (e) {
+                    alert('Backup failed: ' + e.message + '. Please make sure you are logged in.');
+                }
+            }
+        }
+
+        async function clearData(type) {
+            const msg = type === 'tickets' 
+                ? 'Are you sure you want to clear ALL tickets? This cannot be undone!'
+                : 'Are you sure you want to clear all cached emails?';
+            if (confirm(msg)) {
+                try {
+                    const res = await fetch('/api/clear-' + type, {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    const result = await res.json();
+                    if (result.status === 'success') {
+                        alert(type + ' cleared!');
+                        loadStats();
+                    } else {
+                        alert('Clear failed: ' + (result.message || 'Unknown error'));
+                    }
+                } catch (e) {
+                    alert('Clear failed: ' + e.message + '. Please make sure you are logged in.');
+                }
+            }
+        }
+
+        loadFilters();
+    </script>
+</body>
+</html>
